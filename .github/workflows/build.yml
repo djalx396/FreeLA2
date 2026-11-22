@@ -1,0 +1,38 @@
+name: Build FreeLA2
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Configure (universal: Apple Silicon + Intel)"
+        run: cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DFREELA2_BUILD_NUMBER=${{ github.run_number }}
+
+      - name: Build VST3 + AU
+        run: cmake --build build --config Release --target FreeLA2_VST3 FreeLA2_AU -- -quiet
+
+      - name: Ad-hoc sign
+        run: |
+          codesign --force --deep -s - "build/FreeLA2_artefacts/Release/VST3/FreeLA2.vst3"
+          codesign --force --deep -s - "build/FreeLA2_artefacts/Release/AU/FreeLA2.component"
+
+      - name: Check architectures
+        run: lipo -info "build/FreeLA2_artefacts/Release/VST3/FreeLA2.vst3/Contents/MacOS/FreeLA2"
+
+      - name: Package
+        run: |
+          mkdir -p dist
+          cp -R "build/FreeLA2_artefacts/Release/VST3/FreeLA2.vst3" dist/
+          cp -R "build/FreeLA2_artefacts/Release/AU/FreeLA2.component" dist/
+          cp INSTALL.txt dist/
+          cd dist && zip -qry ../FreeLA2-macOS.zip .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FreeLA2-macOS-build-${{ github.run_number }}
+          path: FreeLA2-macOS.zip
