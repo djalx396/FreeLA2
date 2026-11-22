@@ -1,0 +1,27 @@
+FreeLA2 v0.1 - install and first build
+======================================
+
+A) Build it on GitHub (same as RBA-6A / FreeBass)
+   1. On github.com, create a new PUBLIC repository named FreeLA2 (no README).
+   2. Unzip FreeLA2-source-v0.1.zip on your Mac. Open the FreeLA2 folder.
+   3. In the new repository: "uploading an existing file", drag in EVERYTHING inside the FreeLA2 folder
+      (the files and the folders Source, tools, tests, fit, docs, github). Commit.
+   4. The web upload skips the hidden .github folder, so create the workflow by hand:
+      Actions tab -> "set up a workflow yourself" -> name the file  build.yml  (GitHub puts it in .github/workflows)
+      -> delete what's in the editor, paste the whole text of the build.yml file from the zip -> Commit.
+   5. The build starts by itself (about 10 minutes). When it has a green tick, open it and download
+      the artifact "FreeLA2-macOS-build-N" at the bottom. N is the build number; the plug-in shows it in its top bar.
+
+B) Install
+   1. Unzip the artifact. It holds FreeLA2.vst3 and FreeLA2.component.
+   2. Copy FreeLA2.vst3 to      ~/Library/Audio/Plug-Ins/VST3/
+      Copy FreeLA2.component to ~/Library/Audio/Plug-Ins/Components/
+      (In Finder: Go menu -> Go to Folder... and paste the path.)
+   3. In REAPER: Options -> Preferences -> Plug-ins -> VST -> "Re-scan". It shows up as "VST3: FreeLA2 (Chris)".
+   4. If macOS blocks it: System Settings -> Privacy & Security -> "Allow Anyway", then load it again.
+
+Updating later: replace the two files with the new ones. Check the build number in the top bar.
+
+Null test against the Nebula LA-2A set
+   FILTER = OFF and OVERSAMPLE = Off (and RENDER = NEVER), Mix 100 %, then match the knobs.
+   With the Nebula chain as loaded (REDUCTION 0) FreeLA2 at PEAK REDUCTION 0 nulls to about -32 dB.

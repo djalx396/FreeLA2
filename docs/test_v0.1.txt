@@ -1,0 +1,23 @@
+FreeLA2 v0.1.0  build test
+  latency 23 samples
+  ok   OS 1x, filter 0: level -19.14 dB, GR 6.15 dB, latency 23
+  ok   OS 1x, filter 1: level -19.14 dB, GR 6.15 dB, latency 23
+  ok   OS 1x, filter 2: level -19.13 dB, GR 6.15 dB, latency 23
+  ok   OS 2x, filter 0: level -19.14 dB, GR 6.15 dB, latency 23
+  ok   OS 2x, filter 1: level -19.14 dB, GR 6.15 dB, latency 23
+  ok   OS 2x, filter 2: level -19.13 dB, GR 6.15 dB, latency 23
+  ok   OS 4x, filter 0: level -19.14 dB, GR 6.15 dB, latency 23
+  ok   OS 4x, filter 1: level -19.14 dB, GR 6.15 dB, latency 23
+  ok   OS 4x, filter 2: level -19.13 dB, GR 6.15 dB, latency 23
+  ok   OS 8x, filter 0: level -19.14 dB, GR 6.15 dB, latency 23
+  ok   OS 8x, filter 1: level -19.14 dB, GR 6.15 dB, latency 23
+  ok   OS 8x, filter 2: level -19.13 dB, GR 6.15 dB, latency 23
+  ok   plug-in output equals the engine: -152.2 dB
+  ok   power off is a clean, latency-matched bypass
+  ok   AHEAD 3 ms adds 288 samples
+  ok   Mix 0 (filter OFF) = dry signal: -300.0 dB
+  ok   mono at 44.1 kHz
+  ok   192 kHz: 8x falls back to 4x
+  ok   state saves and reloads
+  ok   GUI snapshot written to /tmp/freela2_gui.png
+ALL TESTS PASSED
