@@ -11,10 +11,24 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: "Configure (universal: Apple Silicon + Intel)"
-        run: cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DFREELA2_BUILD_NUMBER=${{ github.run_number }}
+        run: cmake -B build -G Xcode -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DFREELA2_BUILD_NUMBER=${{ github.run_number }}
 
       - name: Build VST3 + AU
         run: cmake --build build --config Release --target FreeLA2_VST3 FreeLA2_AU -- -quiet
+
+      - name: "Check minimum macOS (must be 11 or lower, so older Macs can load it)"
+        run: |
+          for b in "build/FreeLA2_artefacts/Release/VST3/FreeLA2.vst3" "build/FreeLA2_artefacts/Release/AU/FreeLA2.component"; do
+            plist=$(/usr/libexec/PlistBuddy -c "Print :LSMinimumSystemVersion" "$b/Contents/Info.plist" 2>/dev/null || echo none)
+            echo "$b  Info.plist LSMinimumSystemVersion: $plist"
+            vs=$(otool -arch all -l "$b/Contents/MacOS/FreeLA2" | awk '/LC_BUILD_VERSION/{f=1} f&&/minos/{print $2; f=0}')
+            [ -n "$vs" ] || { echo "ERROR: no minimum-OS entry found in the binary"; exit 1; }
+            for v in $vs; do
+              echo "  binary minos: $v"
+              [ "${v%%.*}" -le 11 ] || { echo "ERROR: binary needs macOS $v"; exit 1; }
+            done
+            if [ "$plist" != "none" ] && [ "${plist%%.*}" -gt 11 ]; then echo "ERROR: Info.plist needs macOS $plist"; exit 1; fi
+          done
 
       - name: Ad-hoc sign
         run: |
