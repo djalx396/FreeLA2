@@ -1,9 +1,12 @@
-FreeLA2 v0.1 - install and first build
+FreeLA2 v0.3 - install and build
 ======================================
 
 A) Build it on GitHub (same as RBA-6A / FreeBass)
+   Already have the FreeLA2 repository? Then just upload everything from the new zip into it ("Add file" ->
+   "Upload files", drag in everything inside the FreeLA2 folder, Commit). The workflow is already there, so the
+   build starts by itself; skip to step 5. For a new repository:
    1. On github.com, create a new PUBLIC repository named FreeLA2 (no README).
-   2. Unzip FreeLA2-source-v0.1.zip on your Mac. Open the FreeLA2 folder.
+   2. Unzip FreeLA2-source-v0.3.zip on your Mac. Open the FreeLA2 folder.
    3. In the new repository: "uploading an existing file", drag in EVERYTHING inside the FreeLA2 folder
       (the files and the folders Source, tools, tests, fit, docs, github). Commit.
    4. The web upload skips the hidden .github folder, so create the workflow by hand:
@@ -12,16 +15,26 @@ A) Build it on GitHub (same as RBA-6A / FreeBass)
    5. The build starts by itself (about 10 minutes). When it has a green tick, open it and download
       the artifact "FreeLA2-macOS-build-N" at the bottom. N is the build number; the plug-in shows it in its top bar.
 
-B) Install
-   1. Unzip the artifact. It holds FreeLA2.vst3 and FreeLA2.component.
-   2. Copy FreeLA2.vst3 to      ~/Library/Audio/Plug-Ins/VST3/
-      Copy FreeLA2.component to ~/Library/Audio/Plug-Ins/Components/
-      (In Finder: Go menu -> Go to Folder... and paste the path.)
-   3. In REAPER: Options -> Preferences -> Plug-ins -> VST -> "Re-scan". It shows up as "VST3: FreeLA2 (Chris)".
-   4. If macOS blocks it: System Settings -> Privacy & Security -> "Allow Anyway", then load it again.
+B) Install (Apple Silicon or Intel, macOS 11 or later, e.g. Sonoma)
+   1. Unzip the artifact (it holds a second zip: unzip that too) until you see FreeLA2.vst3 and FreeLA2.component.
+      Drag both onto the Desktop.
+   2. Open Terminal (Cmd + Space, type Terminal, Return), paste this whole block and press Return:
 
-Updating later: replace the two files with the new ones. Check the build number in the top bar.
+mkdir -p ~/Library/Audio/Plug-Ins/VST3 ~/Library/Audio/Plug-Ins/Components
+rm -rf ~/Library/Audio/Plug-Ins/VST3/FreeLA2.vst3 ~/Library/Audio/Plug-Ins/Components/FreeLA2.component
+cp -R ~/Desktop/FreeLA2.vst3 ~/Library/Audio/Plug-Ins/VST3/
+cp -R ~/Desktop/FreeLA2.component ~/Library/Audio/Plug-Ins/Components/
+xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/FreeLA2.vst3 ~/Library/Audio/Plug-Ins/Components/FreeLA2.component
+killall -9 AudioComponentRegistrar
+
+      (If Terminal asks to access the Desktop: Allow. "No matching processes" at the end is fine.)
+   3. Optional AU check:  auval -v aufx FLa2 Chrs   -> should end with AU VALIDATION SUCCEEDED.
+   4. Restart REAPER. Options -> Preferences -> Plug-ins -> VST -> "Re-scan". It shows up as "VST3: FreeLA2 (Chris)".
+
+Updating later: put the two new files on the Desktop and paste the same block again. Check the build number in the top bar.
 
 Null test against the Nebula LA-2A set
    FILTER = OFF and OVERSAMPLE = Off (and RENDER = NEVER), Mix 100 %, then match the knobs.
-   With the Nebula chain as loaded (REDUCTION 0) FreeLA2 at PEAK REDUCTION 0 nulls to about -32 dB.
+   (With a filter on, LINEAR nulls deeper than ANALOG: no phase shift, only the ultrasonic content differs.)
+   Pre OUTPUT = the Nebula Pre OUT and Comp INPUT together (add their dB). With the Nebula chain as loaded
+   (REDUCTION 0) FreeLA2 at its defaults (PEAK REDUCTION 0) nulls to about -29 dB (median of the test signals).

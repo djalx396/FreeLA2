@@ -23,7 +23,8 @@ namespace M
     constexpr int g2N = 24;
     // LF: two analog sections (fz qz fp qp each): section 1 = [lfF, lfQ, 34, 35], section 2 = [36 .. 39]
     constexpr int lf1fp = 34, lf1qp = 35, lf2fz = 36, lf2qz = 37, lf2fp = 38, lf2qp = 39;
-    constexpr int preTrimDb = 43, preDelayUs = 44; // fixed gain and sub-sample delay of the Nebula Pre
+    constexpr int preTrimDb = 43, preDelayUs = 44;
+    constexpr int ripHpF = 45;      // ripple high-pass (Hz): the cell ripple follows the waveform, not envelope jumps (0 = off) // fixed gain and sub-sample delay of the Nebula Pre
     // Clipper
     constexpr int clipC = 40, clipN = 41, clipLeak = 42;
     // EMPHASIS: 5 points (0, .25, .5, .75, 1) x (fc Hz, low-band weight, low-band attack ms)
@@ -50,16 +51,15 @@ struct Settings
     bool   preOn = true, compOn = true, clipOn = true;
     bool   pushed = false;      // Pre program
     double drive = 0.0;         // Pre DRIVE, -30..+30 (dB of 2nd harmonic)
-    double preOutDb = 0.0;      // Pre OUTPUT
+    double levelDb = 0.0;       // Pre OUTPUT = Leveler INPUT (one gain; 0 = Nebula as loaded)
     bool   limit = false;       // Comp program
-    double inputDb = 0.0;       // Comp INPUT (0 = Nebula as loaded)
     double reduction = 0.0;     // PEAK REDUCTION 0..100
     double emphasis = 0.0;      // -100 (FASTER ATTACK) .. +100 (BASS SLOW ATT)
     double gainDb = 0.0;        // Comp GAIN 0..25
     double aheadMs = 0.0;       // look-ahead
     double clipIn = 0.0;        // Clipper DRIVE 0..40 dB
     double clipOutDb = 0.0;     // Clipper OUTPUT 0..10 dB
-    double mix = 1.0;           // 0..1
+    double mix = 1.0;           // Leveler wet/dry 0..1 (0 = Pre straight into the Clipper)
     int    filterMode = 1;      // 0 OFF, 1 CLEAN, 2 AIR (active only when the internal rate is >= 88.2 kHz)
     int    filtersForce = -1;   // -1 auto, 0 off, 1 on regardless of rate (tests only)
 };
@@ -237,7 +237,7 @@ public:
         for (int c = 0; c < 2; ++c)
         {
             aheadDel[c].prepare (maxAhead * factor + 2);
-            dryDel[c].prepare ((maxAhead + 1) * factor + 2);
+            preByp[c].prepare (factor + 2); preByp[c].setDelay (factor);   // Pre switched off: keep its one-sample latency
         }
         prepared = true;
         lastLayout = -2;
@@ -251,9 +251,9 @@ public:
         for (int c = 0; c < 2; ++c)
         {
             lf[c].reset(); lfSh[c].reset(); hfFir[c].reset(); h2shelf[c].reset(); h2hp1[c].reset(); h2hp2[c].reset(); env[c] = 0;
-            bl[c].reset(); aheadDel[c].reset(); dryDel[c].reset(); g2Cache[c] = 1; g2Count[c] = 0;
+            bl[c].reset(); aheadDel[c].reset(); preByp[c].reset(); g2Cache[c] = 1; g2Count[c] = 0;
         }
-        ripEnv = 0; ripLp.reset(); kr = 0;
+        ripEnv = 0; ripLp.reset(); ripHp1.reset(); ripHp2.reset(); kr = 0;
         msH = msL = pkH = pkL = 0; lfSm = 0; split.reset(); G1 = G2 = G3 = 0;
         gPrev = gNow = 1.0; tick = 0; grOut = 0;
     }
@@ -267,12 +267,11 @@ public:
         const int lay = fOn ? s.filterMode : 0;
         if (force || lay != lastLayout) { buildFilters (lay); lastLayout = lay; }
         // Pre
-        tPreOut = std::pow (10.0, s.preOutDb / 20.0);
+        tLevel = std::pow (10.0, s.levelDb / 20.0);
         tK2 = model[M::k2] * std::pow (10.0, s.drive / 20.0);
         k3 = model[M::k3];
         // Comp
         P = model.prog (s.limit);
-        tGIn = std::pow (10.0, s.inputDb / 20.0);
         tGOut = std::pow (10.0, s.gainDb / 20.0);
         r = std::max (0.0, std::min (1.0, s.reduction / 100.0));
         updateDetector (force || limitChanged);
@@ -280,10 +279,10 @@ public:
         tCg = std::pow (10.0, s.clipIn / 20.0);
         tCOut = std::pow (10.0, s.clipOutDb / 20.0);
         tMix = std::max (0.0, std::min (1.0, s.mix));
-        if (force) { preOut = tPreOut; k2 = tK2; gIn = tGIn; gOut = tGOut; cg = tCg; cOut = tCOut; mix = tMix; }
+        if (force) { level = tLevel; k2 = tK2; gOut = tGOut; cg = tCg; cOut = tCOut; mix = tMix; }
         // AHEAD (whole session-rate samples)
         aheadBase = std::max (0, std::min (maxAhead, (int) std::lround (s.aheadMs * 1e-3 * fs)));
-        for (int c = 0; c < 2; ++c) { aheadDel[c].setDelay (aheadBase * factor); dryDel[c].setDelay (aheadBase * factor + (s.preOn ? factor : 0)); }
+        for (int c = 0; c < 2; ++c) aheadDel[c].setDelay (aheadBase * factor);
     }
 
     // in-place, internal rate, n samples; nch 1 or 2
@@ -297,10 +296,10 @@ public:
         const double* g2t = model.v.data() + M::g2Tab;
         for (int i = 0; i < n; ++i)
         {
-            double x[2], dry[2];
-            for (int c = 0; c < nch; ++c) { x[c] = ch[c][i]; dry[c] = x[c]; }
+            double x[2];
+            for (int c = 0; c < nch; ++c) x[c] = ch[c][i];
             // parameter smoothing (about 20 ms)
-            preOut += sm * (tPreOut - preOut); k2 += sm * (tK2 - k2); gIn += sm * (tGIn - gIn); gOut += sm * (tGOut - gOut);
+            level += sm * (tLevel - level); k2 += sm * (tK2 - k2); gOut += sm * (tGOut - gOut);
             cg += sm * (tCg - cg); cOut += sm * (tCOut - cOut); mix += sm * (tMix - mix);
             const double invCg = 1.0 / cg;
             // ---- slot 0, Pre
@@ -331,15 +330,14 @@ public:
                     double h2 = h2shelf[c].process (v * v);
                     h2 = h2hp2[c].process (h2hp1[c].process (h2));
                     v = v + k2 * g2 * h2 + k3 * v * v * v;
-                    v *= preOut;
                 }
-                x[c] = bl[c].process (1, v);
+                else v = preByp[c].process (v);
+                x[c] = bl[c].process (1, v * level);          // Pre OUTPUT = Leveler INPUT
             }
             // ---- Comp: detector at the session rate, gain ramped across the internal samples
             if (set.compOn)
             {
-                double u[2];
-                for (int c = 0; c < nch; ++c) u[c] = x[c] * gIn;
+                const double* u = x;
                 if (tick == 0)
                 {
                     const double sc = nch == 2 ? 0.5 * (u[0] + u[1]) : u[0];
@@ -359,9 +357,12 @@ public:
                     ripEnv += cRipEnv * (ar - ripEnv);
                     double rel = ripEnv > 1e-9 ? ar / ripEnv - 1.0 : 0.0;
                     rel = std::max (-1.0, std::min (3.0, rel));
-                    rg = 1.0 - 0.11512925464970229 * kr * ripLp.process (rel);      // exp(-x) for tiny x
+                    if (ripHpOn) rel = ripHp2.process (ripHp1.process (rel));        // keep only the waveform ripple
+                    rg = std::exp (-0.11512925464970229 * kr * ripLp.process (rel));
                 }
-                for (int c = 0; c < nch; ++c) x[c] = aheadDel[c].process (u[c]) * g * rg * gOut;
+                // MIX blends the Leveler only: the dry part is the (look-ahead delayed) Leveler input
+                const double wd = mix * g * rg * gOut + (1.0 - mix);
+                for (int c = 0; c < nch; ++c) x[c] = aheadDel[c].process (x[c]) * wd;
                 if (grTrace) grTrace[i] = grOut;
             }
             else if (grTrace) grTrace[i] = 0;
@@ -380,13 +381,8 @@ public:
                     const double y = (1.0 - leak) * v * sh + leak * v;
                     x[c] = y * invCg * cOut;
                 }
-            // ---- slot 3 (+ final full sets), Mix
-            for (int c = 0; c < nch; ++c)
-            {
-                const double w = bl[c].process (3, x[c]);
-                const double d = bl[c].processDry (dryDel[c].process (dry[c]));
-                ch[c][i] = mix * w + (1.0 - mix) * d;
-            }
+            // ---- slot 3 (+ the final complete filter)
+            for (int c = 0; c < nch; ++c) ch[c][i] = bl[c].process (3, x[c]);
         }
     }
 
@@ -397,7 +393,7 @@ public:
     bool filtersActive() const { return bl[0].active(); }
     int aheadSamplesBase() const { return aheadBase; }
     // fixed latency of the engine in session-rate samples (Pre HF filter) + AHEAD
-    int latencyBase() const { return (set.preOn ? 1 : 0) + aheadBase; }
+    int latencyBase() const { return 1 + aheadBase; }
     // low-frequency group delay of the band-limiting filters in session-rate samples (for latency reporting)
     double filterDelayBase() const { return bl[0].groupDelaySec() * fs; }
 
@@ -456,7 +452,9 @@ private:
         detOff = P[I::detOff];
         qRel = P[I::qRel];
         d3a = P[I::d3a]; d3p = P[I::d3p]; d3cap = P[I::d3cap];
-        ripLp.setHzLP (std::max (10.0, P[I::d3fc]), fo); cRipEnv = 1.0 - std::exp (-1.0 / (0.02 * fo));
+        ripLp.setHzLP (std::max (1.0, P[I::d3fc]), fo); cRipEnv = 1.0 - std::exp (-1.0 / (0.02 * fo));
+        ripHpOn = model[M::ripHpF] > 0;
+        if (ripHpOn) { ripHp1.highpass (model[M::ripHpF], 0.5412, fo); ripHp2.highpass (model[M::ripHpF], 1.3066, fo); }
         if (reset) { G1 = G2 = G3 = 0; }
     }
 
@@ -497,9 +495,9 @@ private:
     int lastLayout = -2, maxAhead = 600, aheadBase = 0;
     // Pre
     Biquad lf[2], lfSh[2], h2shelf[2], h2hp1[2], h2hp2[2]; SymFir hfFir[2]; double env[2] {}, envRelC = 0.999, preTrim = 1;
-    OnePole ripLp; double d3a = 0, d3p = 2, d3cap = 0, kr = 0, ripEnv = 0, cRipEnv = 0.001;
-    double preOut = 1, k2 = 0, k3 = 0, tPreOut = 1, tK2 = 0, sm = 0.001;
-    double tGIn = 1, tGOut = 1, tCg = 1, tCOut = 1, tMix = 1, grMax = 0, clipMax = 0;
+    OnePole ripLp; Biquad ripHp1, ripHp2; bool ripHpOn = false; double d3a = 0, d3p = 2, d3cap = 0, kr = 0, ripEnv = 0, cRipEnv = 0.001;
+    double level = 1, k2 = 0, k3 = 0, tLevel = 1, tK2 = 0, sm = 0.001;
+    double tGOut = 1, tCg = 1, tCOut = 1, tMix = 1, grMax = 0, clipMax = 0;
     double g2Cache[2] { 1, 1 }; unsigned g2Count[2] { 0, 0 };
     static constexpr double kClipTabMax = 16.0, kClipTabScale = 512.0;
     std::vector<double> clipTab;
@@ -507,13 +505,13 @@ private:
     fbl::BandLimit<4> bl[2];
     // Comp
     const double* P = nullptr;
-    double gIn = 1, gOut = 1, r = 0;
+    double gOut = 1, r = 0;
     OnePole split, cM, lfAtt, lfRel; double relP = 0.99, beta = 0, wl = 1, lfSm = 0;
     double msH = 0, msL = 0, pkH = 0, pkL = 0;
     double cTa1 = 1, cTa2 = 1, cTa3 = 1, cTr1 = 1, cTr2 = 1, cTr3 = 1, w1 = 1, w2 = 0, w3 = 0, Eexp = 3, pexp = 1;
     double cap2 = 1e9, cap3 = 1e9, detOff = 0, qRel = 0;
     double G1 = 0, G2 = 0, G3 = 0, grOut = 0, gPrev = 1, gNow = 1; int tick = 0;
-    Delay aheadDel[2], dryDel[2];
+    Delay aheadDel[2], preByp[2];
     // Clipper
     double cg = 1, cOut = 1;
     double mix = 1;

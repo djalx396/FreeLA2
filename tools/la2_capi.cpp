@@ -9,7 +9,7 @@ extern "C"
     {
         la2::Settings t;
         t.preOn = s[0] > 0.5; t.compOn = s[1] > 0.5; t.clipOn = s[2] > 0.5; t.pushed = s[3] > 0.5; t.drive = s[4];
-        t.preOutDb = s[5]; t.limit = s[6] > 0.5; t.inputDb = s[7]; t.reduction = s[8]; t.emphasis = s[9]; t.gainDb = s[10];
+        t.levelDb = s[5] + s[7]; /* preOutDb + inputDb: one gain since v0.2 */ t.limit = s[6] > 0.5; t.reduction = s[8]; t.emphasis = s[9]; t.gainDb = s[10];
         t.aheadMs = s[11]; t.clipIn = s[12]; t.clipOutDb = s[13]; t.mix = s[14]; t.filterMode = (int) s[15]; t.filtersForce = (int) s[16];
         return t;
     }

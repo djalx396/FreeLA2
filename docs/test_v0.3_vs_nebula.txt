@@ -1,0 +1,36 @@
+FreeLA2 v0.3 against the Nebula OPTO-2A renders (2026-11-23)
+============================================================
+
+Same method as docs/test_v0.2_vs_nebula.txt: the plug-in itself runs over all 219 capture signals in capture order
+in one instance, with each render's Nebula knob settings and stages. null = residual vs the Nebula output (dB, lower
+is closer); lvl = rms of the level / gain-reduction difference in 50 ms windows while the signal plays (dB).
+
+v0.3 changes nothing in the dynamics or the tone. It adds FILTER phase ANALOG / LINEAR and exact alignment of the
+filters (v0.2 was up to 36 us early with OVERSAMPLE Off and a filter on). With FILTER OFF the results are identical
+to v0.2. With the filters on, the nulls are deeper, most of all in LINEAR (only the ultrasonic content removed by
+the filters is left).
+
+group (median)                       n  FILTER OFF, OS Off    CLEAN 2x ANALOG       CLEAN 2x LINEAR      
+Pre NORMAL, as loaded                9  null  -37.6 lvl 0.02  null  -31.2 lvl 0.07  null  -34.5 lvl 0.07 
+Pre NORMAL, DRIVE sweep             15  null  -35.9 lvl 0.10  null  -18.0 lvl 0.13  null  -26.2 lvl 0.13 
+Pre OUTPUT sweep                     2  null  -47.4 lvl 0.00  null  -46.9 lvl 0.01  null  -46.6 lvl 0.01 
+COMP REDUCTION scan / as loaded     16  null  -35.7 lvl 0.12  null  -24.4 lvl 0.20  null  -27.8 lvl 0.20 
+COMP calibration tries               3  null  -17.9 lvl 0.42  null  -17.9 lvl 0.42  null  -17.9 lvl 0.42 
+COMP GR03/08/15                     17  null  -21.5 lvl 0.55  null  -19.4 lvl 0.55  null  -21.4 lvl 0.55 
+COMP GAIN                            3  null  -17.8 lvl 0.68  null  -17.8 lvl 0.68  null  -17.8 lvl 0.68 
+COMP AHEAD (no effect in Nebula)    10  null  -24.6 lvl 0.25  null  -24.5 lvl 0.29  null  -24.5 lvl 0.29 
+COMP DRY 0                           2  null  -20.3 lvl 0.44  null  -17.1 lvl 0.49  null  -20.3 lvl 0.49 
+COMP EMPHASIS                       17  null  -21.0 lvl 0.57  null  -17.9 lvl 0.57  null  -21.0 lvl 0.57 
+COMP INPUT (= LEVEL)                 8  null  -15.1 lvl 0.69  null  -14.5 lvl 0.71  null  -15.0 lvl 0.71 
+Clipper as loaded / OUTPUT          11  null  -35.0 lvl 0.11  null  -22.4 lvl 0.18  null  -31.4 lvl 0.18 
+Clipper DRIVE sweep                 15  null  -10.5 lvl 0.46  null   -9.4 lvl 0.69  null  -10.6 lvl 0.69 
+Chain as loaded                      9  null  -29.0 lvl 0.13  null  -21.1 lvl 0.16  null  -22.3 lvl 0.16 
+Chain, Leveler at 8 dB               6  null  -18.1 lvl 0.60  null  -17.9 lvl 0.61  null  -18.0 lvl 0.61 
+Pre PUSHED, as loaded                9  null  -36.1 lvl 0.04  null  -31.3 lvl 0.07  null  -34.1 lvl 0.07 
+Pre PUSHED, DRIVE sweep             15  null  -36.0 lvl 0.10  null  -18.0 lvl 0.11  null  -26.2 lvl 0.11 
+LIMIT REDUCTION scan / as loaded    15  null  -34.1 lvl 0.12  null  -23.9 lvl 0.18  null  -32.6 lvl 0.19 
+LIMIT GR03/08/15                    19  null  -19.6 lvl 0.46  null  -19.1 lvl 0.53  null  -19.1 lvl 0.53 
+LIMIT EMPHASIS                       9  null  -22.3 lvl 0.49  null  -19.3 lvl 0.49  null  -22.3 lvl 0.49 
+
+For comparison, v0.2 with CLEAN 2x: Pre as loaded -26.1 dB, Chain as loaded -21.3 dB, Clipper as loaded -23.9 dB.
+Known limits are unchanged from v0.2 (see README).

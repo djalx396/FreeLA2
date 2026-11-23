@@ -21,7 +21,8 @@ def tables(prog, corr=None):
     M = np.load('meas_comp.npz'); pts = []
     for j, t in enumerate(['GR03', 'GR08', 'GR15']):
         a = M['%s_%s_st' % (prog, t)][:67]; L, g = a[:, 0], a[:, 1]
-        res = np.median(g[L <= -45]); g = np.where(g < 1.0, np.maximum(0, g - res), g)
+        res = np.median(g[(L <= -45) & (L >= -52)]); g = np.where(g < 1.0, np.maximum(0, g - res), g)
+        k = int(np.argmax(g >= 0.3)); g = np.where(L < L[k] - 6, 0.0, g)      # v0.2: no leftover floor from the previous render
         if corr is not None: g = g + corr[j]
         pts.append((L, g))
     return build_tables(pts, KNOB[prog], M['%s_scan' % prog])

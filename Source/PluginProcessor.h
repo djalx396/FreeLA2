@@ -2,6 +2,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include "LA2Engine.h"
+#include "PhaseAlign.h"
 
 #ifndef FREELA2_BUILD
  #define FREELA2_BUILD "local"
@@ -9,10 +10,11 @@
 
 namespace ID
 {
-    static const juce::String power { "power" }, pushed { "pushed" }, drive { "drive" }, preout { "preout" },
-        limit { "limit" }, input { "input" }, reduction { "reduction" }, emphasis { "emphasis" }, gain { "gain" },
+    static const juce::String power { "power" }, pushed { "pushed" }, drive { "drive" }, level { "level" },
+        limit { "limit" }, reduction { "reduction" }, emphasis { "emphasis" }, gain { "gain" },
         ahead { "ahead" }, clipdrive { "clipdrive" }, clipout { "clipout" }, mix { "mix" }, filter { "filter" },
-        oslive { "oslive" }, osrender { "osrender" }, rendermode { "rendermode" }, meter { "meter" }, finish { "finish" };
+        oslive { "oslive" }, osrender { "osrender" }, rendermode { "rendermode" }, meter { "meter" }, finish { "finish" },
+        phase { "phase" };
 }
 
 class FreeLA2Processor : public juce::AudioProcessor
@@ -54,11 +56,12 @@ public:
     std::atomic<int>   activeFactor { 1 };
     std::atomic<bool>  filtersOn { false };
     std::atomic<int>   latencyNow { 0 };
+    std::atomic<int>   testStages { 7 };           // tests only (not a parameter): 1 Pre, 2 Leveler, 4 Clipper
     int maxFactorForRate() const { return maxFactor; }
     static juce::String versionString() { return juce::String ("v") + JucePlugin_VersionString + "  build " + FREELA2_BUILD; }
 
-    enum PIdx { pPower, pPushed, pDrive, pPreOut, pLimit, pInput, pReduction, pEmphasis, pGain, pAhead, pClipDrive, pClipOut,
-                pMix, pFilter, pOsLive, pOsRender, pRenderMode, pCount };
+    enum PIdx { pPower, pPushed, pDrive, pLevel, pLimit, pReduction, pEmphasis, pGain, pAhead, pClipDrive, pClipOut,
+                pMix, pFilter, pOsLive, pOsRender, pRenderMode, pPhase, pCount };
     static constexpr double kAheadMs[5] = { 0.0, 1.5, 3.0, 4.5, 6.0 };
 
 private:
@@ -72,12 +75,16 @@ private:
     {
         int factor = 1;
         std::unique_ptr<juce::dsp::Oversampling<double>> os;   // null for factor 1
-        int osLatency = 0;                                     // session-rate samples
-        int filterDelay[3] { 0, 0, 0 };                        // band-limit delay for OFF / CLEAN / AIR (session-rate samples)
         la2::Engine eng;
+        // alignment of the linear part (oversampling filters + band-limit sections), per filter mode OFF / CLEAN / AIR
+        double tau[3] { 0, 0, 0 };                             // measured low-frequency delay, session-rate samples
+        std::vector<double> fir[2][3];                         // [ANALOG / LINEAR][mode] output FIR
+        int pad[2][3] {};                                      // whole-sample padding after the FIR
     };
     std::array<OsSet, 4> sets;
-    int activeSet = 0, maxFactor = 8, fixedLatency = 0, numCh = 2, maxBlock = 512;
+    int activeSet = 0, maxFactor = 8, numCh = 2, maxBlock = 512;
+    int fixedLat[2] { 0, 0 };                                  // ANALOG / LINEAR (without AHEAD)
+    void measureLinear (OsSet& set, int mode, std::vector<double>& h);
     double fs = 48000;
     la2::Model model;
 
@@ -97,7 +104,8 @@ private:
     };
     Delay padDelay[2], bypassDelay[2];
     juce::AudioBuffer<double> work, dryBuf;
-    int lastAheadIdx = -1;
+    int lastAheadIdx = -1, lastPhase = -1;
+    pa::Fir outFir[2];
     bool wasOn = true;
     juce::SmoothedValue<double> bypassMix;     // 1 = processed, 0 = bypassed (click-free power switch)
 

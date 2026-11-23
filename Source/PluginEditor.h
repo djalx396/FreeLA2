@@ -85,10 +85,10 @@ private:
 
     FreeLA2Processor& proc;
     FaceLook look;
-    FaceKnob preDrive, preOut, reduction, gain, input, ahead, emphasis, mix, clipDrive, clipOut;
+    FaceKnob preDrive, preOut, reduction, gain, ahead, emphasis, mix, clipDrive, clipOut;
     BatSwitch pushedSw, limitSw;
     Segmented filterSeg, osSeg, renderOsSeg, meterSeg, finishSeg;
-    juce::TextButton renderBtn;
+    juce::TextButton renderBtn, phaseBtn;
     VuMeter vu;
     juce::Rectangle<int> powerArea;
     float vuSmooth = -20.f, outSmooth = 0.f; int clipHold = 0; int lastFinish = -1;

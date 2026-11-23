@@ -247,10 +247,9 @@ void VuMeter::paint (juce::Graphics& g)
 FreeLA2Editor::FreeLA2Editor (FreeLA2Processor& p)
     : AudioProcessorEditor (&p), proc (p),
       preDrive (p.apvts, ID::drive, { "-30", "-15", "0", "+15", "+30" }),
-      preOut (p.apvts, ID::preout, { "-12", "-6", "0", "+6" }),
+      preOut (p.apvts, ID::level, { "-18", "-9", "0", "+9", "+18" }),
       reduction (p.apvts, ID::reduction, { "0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100" }),
       gain (p.apvts, ID::gain, { "0", "5", "10", "15", "20", "25" }),
-      input (p.apvts, ID::input, { "-12", "-6", "0", "+6", "+12" }),
       ahead (p.apvts, ID::ahead, { "0", "1.5", "3", "4.5", "6" }, 5, true),
       emphasis (p.apvts, ID::emphasis, {}, 11),
       mix (p.apvts, ID::mix, { "0", "50", "100" }),
@@ -265,7 +264,7 @@ FreeLA2Editor::FreeLA2Editor (FreeLA2Processor& p)
 {
     setLookAndFeel (&look);
     struct K { FaceKnob* k; int d; };
-    for (auto k : { K { &preDrive, 84 }, K { &preOut, 84 }, K { &reduction, 116 }, K { &gain, 116 }, K { &input, 46 }, K { &ahead, 46 },
+    for (auto k : { K { &preDrive, 84 }, K { &preOut, 84 }, K { &reduction, 116 }, K { &gain, 116 }, K { &ahead, 46 },
                     K { &emphasis, 54 }, K { &mix, 54 }, K { &clipDrive, 84 }, K { &clipOut, 84 } })
     {
         k.k->diameter = k.d; k.k->slider.setLookAndFeel (&look); addAndMakeVisible (*k.k);
@@ -278,6 +277,8 @@ FreeLA2Editor::FreeLA2Editor (FreeLA2Processor& p)
     osSeg.isAvailable = avail; renderOsSeg.isAvailable = avail;
     filterSeg.setTooltip ("Ultrasonic band-limiting (needs 88.2 kHz or more inside):\nOFF = none (null tests)\n"
                           "CLEAN = a complete 25 kHz filter after each stage\nAIR = D > Pre > C > Comp > B > Clipper > A, then a complete filter");
+    preOut.slider.setTooltip ("Pre Output = Leveler Input (one gain: drives the Leveler and the Clipper)");
+    mix.slider.setTooltip ("Leveler Mix: blends the Leveler only. 0 % = the Preamp goes straight into the Clipper");
     renderBtn.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff24221f));
     renderBtn.setColour (juce::TextButton::textColourOffId, ui::barText);
     renderBtn.onClick = [this]
@@ -288,13 +289,24 @@ FreeLA2Editor::FreeLA2Editor (FreeLA2Processor& p)
     };
     renderBtn.setTooltip ("Use the render oversampling: Auto = when rendering, Always, or Never");
     addAndMakeVisible (renderBtn);
+    phaseBtn.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff24221f));
+    phaseBtn.setColour (juce::TextButton::textColourOffId, ui::barText);
+    phaseBtn.onClick = [this]
+    {
+        auto& pp = P (ID::phase);
+        const int next = 1 - choice (ID::phase);
+        pp.beginChangeGesture(); pp.setValueNotifyingHost (pp.convertTo0to1 ((float) next)); pp.endChangeGesture();
+    };
+    phaseBtn.setTooltip ("Filter phase:\nANALOG = analog-style filters, lowest latency\n"
+                         "LINEAR = linear phase: no phase shift in the top end (+1 ms latency)");
+    addAndMakeVisible (phaseBtn);
     setSize (1120, 620);
     startTimerHz (30);
 }
 
 FreeLA2Editor::~FreeLA2Editor()
 {
-    for (auto* k : { &preDrive, &preOut, &reduction, &gain, &input, &ahead, &emphasis, &mix, &clipDrive, &clipOut })
+    for (auto* k : { &preDrive, &preOut, &reduction, &gain, &ahead, &emphasis, &mix, &clipDrive, &clipOut })
         k->slider.setLookAndFeel (nullptr);
     setLookAndFeel (nullptr);
 }
@@ -304,7 +316,7 @@ void FreeLA2Editor::resized()
     auto place = [] (FaceKnob& k, int cx, int cy) { const int s = k.diameter + 60; k.setBounds (cx - s / 2, cy - s / 2, s, s); };
     place (preDrive, 160, 300); place (preOut, 160, 480);
     place (reduction, 712, 204); place (gain, 712, 430);
-    place (input, 440, 396); place (ahead, 536, 396);
+    place (ahead, 480, 396);
     place (emphasis, 400, 526); place (mix, 560, 526);
     place (clipDrive, 960, 300); place (clipOut, 960, 480);
     pushedSw.setBounds (136, 112, 48, 64);
@@ -317,7 +329,8 @@ void FreeLA2Editor::resized()
     renderOsSeg.setBounds (966, 9, 90, 30);
     renderBtn.setBounds (898, 9, 64, 30);
     osSeg.setBounds (690, 9, 142, 30);
-    filterSeg.setBounds (428, 9, 150, 30);
+    phaseBtn.setBounds (512, 9, 72, 30);
+    filterSeg.setBounds (372, 9, 136, 30);
 }
 
 void FreeLA2Editor::mouseUp (const juce::MouseEvent& e)
@@ -351,10 +364,12 @@ void FreeLA2Editor::timerCallback()
     {
         lastFinish = fin;
         const auto& F = ui::finish (fin);
-        for (auto* k : { &preDrive, &preOut, &reduction, &gain, &input, &ahead, &emphasis, &mix, &clipDrive, &clipOut }) k->setInk (F.ink);
+        for (auto* k : { &preDrive, &preOut, &reduction, &gain, &ahead, &emphasis, &mix, &clipDrive, &clipOut }) k->setInk (F.ink);
         meterSeg.setColours (F.ink, F.plate); finishSeg.setColours (F.ink, F.plate);
+        repaint();                                       // the whole faceplate, not just the knob areas
     }
     renderBtn.setButtonText (juce::StringArray { "AUTO", "ALWAYS", "NEVER" }[choice (ID::rendermode)]);
+    phaseBtn.setButtonText (choice (ID::phase) == 1 ? "LINEAR" : "ANALOG");
     repaint (0, 0, getWidth(), 48);
     repaint (540, 290, 80, 40);
     repaint (930, 110, 60, 50);
@@ -387,7 +402,7 @@ void FreeLA2Editor::paint (juce::Graphics& g)
     label ("LIMIT", 300, 344, 80, 13.f, 1.8f); label ("COMP", 300, 432, 80, 13.f, 1.8f);
     label ("DRIVE", 100, 352, 120, 13.f, 1.8f); label ("OUTPUT", 100, 532, 120, 13.f, 1.8f);
     label ("PEAK REDUCTION", 632, 288, 160, 14.f, 2.2f); label ("GAIN", 632, 514, 160, 14.f, 2.2f);
-    label ("INPUT", 400, 432, 80, 13.f, 1.8f); label ("AHEAD ms", 496, 432, 80, 13.f, 1.4f);
+    label ("AHEAD ms", 440, 432, 80, 13.f, 1.4f);
     label ("EMPHASIS", 350, 566, 100, 13.f, 1.8f); label ("MIX", 510, 566, 100, 13.f, 1.8f);
     label ("DRIVE", 900, 352, 120, 13.f, 1.8f); label ("OUTPUT", 900, 532, 120, 13.f, 1.8f);
     label ("CLIP", 910, 158, 100, 13.f, 1.8f);
@@ -430,13 +445,13 @@ void FreeLA2Editor::paint (juce::Graphics& g)
     g.setColour (ui::amber.withAlpha (0.9f)); g.setFont (ui::cond (12.f, true));
     spacedText (g, FreeLA2Processor::versionString().toUpperCase(), juce::Rectangle<float> (128, 25, 220, 16), 1.2f, juce::Justification::left);
     g.setColour (ui::barSub); g.setFont (ui::cond (12.f, true));
-    spacedText (g, "FILTER", juce::Rectangle<float> (364, 16, 58, 16), 1.6f, juce::Justification::right);
+    spacedText (g, "FILTER", juce::Rectangle<float> (310, 16, 58, 16), 1.6f, juce::Justification::right);
     spacedText (g, "OVERSAMPLE", juce::Rectangle<float> (588, 16, 96, 16), 1.6f, juce::Justification::right);
     spacedText (g, "RENDER", juce::Rectangle<float> (836, 16, 58, 16), 1.6f, juce::Justification::right);
     if (choice (ID::filter) > 0 && ! proc.filtersOn.load())
     {
         g.setColour (ui::barSub.withAlpha (0.8f)); g.setFont (ui::cond (10.f, true));
-        g.drawText ("inactive below 88.2k", 428, 38, 150, 10, juce::Justification::centred);
+        g.drawText ("inactive below 88.2k", 372, 38, 136, 10, juce::Justification::centred);
     }
     // power button
     const auto pc = power ? ui::amber : juce::Colour (0xff6b665e);

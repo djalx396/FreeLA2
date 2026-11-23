@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(FreeLA2 VERSION 0.1.0)
+project(FreeLA2 VERSION 0.3.0)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -65,7 +65,14 @@ if(FLA2_BUILD_TESTS)
     juce_add_console_app(FreeLA2Test PRODUCT_NAME "FreeLA2Test")
     target_sources(FreeLA2Test PRIVATE tests/plugin_test.cpp Source/PluginProcessor.cpp Source/PluginEditor.cpp)
     target_compile_definitions(FreeLA2Test PRIVATE FREELA2_BUILD="test" JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0
-        JucePlugin_Name="FreeLA2" JucePlugin_VersionString="0.1.0" JucePlugin_Build_Standalone=0 JUCE_MODAL_LOOPS_PERMITTED=1)
+        JucePlugin_Name="FreeLA2" JucePlugin_VersionString="0.3.0" JucePlugin_Build_Standalone=0 JUCE_MODAL_LOOPS_PERMITTED=1)
     target_link_libraries(FreeLA2Test PRIVATE juce::juce_audio_utils juce::juce_audio_processors juce::juce_dsp
+        juce::juce_recommended_config_flags)
+    # Runs the plug-in on the Nebula capture signals (driven by fit/compare_nebula.py)
+    juce_add_console_app(FreeLA2Compare PRODUCT_NAME "FreeLA2Compare")
+    target_sources(FreeLA2Compare PRIVATE tests/compare_nebula.cpp Source/PluginProcessor.cpp Source/PluginEditor.cpp)
+    target_compile_definitions(FreeLA2Compare PRIVATE FREELA2_BUILD="test" JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0
+        JucePlugin_Name="FreeLA2" JucePlugin_VersionString="0.3.0" JucePlugin_Build_Standalone=0 JUCE_MODAL_LOOPS_PERMITTED=1)
+    target_link_libraries(FreeLA2Compare PRIVATE juce::juce_audio_utils juce::juce_audio_processors juce::juce_dsp
         juce::juce_recommended_config_flags)
 endif()

@@ -1,0 +1,287 @@
+FreeLA2 v0.2 against the Nebula OPTO-2A renders (2026-11-23)
+=============================================================
+
+How: the plug-in itself (the same processor as the VST3/AU, tests/compare_nebula.cpp) ran over every one of the
+219 capture signals in capture order, in ONE instance (state carries over from render to render like the REAPER
+renders), with each render's Nebula knob settings mapped to FreeLA2's knobs and the same stages switched on
+(Pre / Leveler / Clipper alone, or the whole chain). Output compared with each Nebula render, from 1 s on.
+  null   = residual (FreeLA2 - Nebula) relative to the Nebula output, dB. Lower is closer.
+  level  = rms of the level difference in 50 ms windows while the signal plays, dB (= gain-reduction error for the Leveler).
+Not compared: DRY 25-100 % (FreeLA2 has MIX instead), INPUT 0 and Pre OUT 0 (mute), the dry reference renders.
+Nebula AHEAD does nothing; those renders are compared with FreeLA2 AHEAD = 0.
+
+Summary by group (median over the renders in the group)
+group                                n  A: FILTER OFF, OS Off B: CLEAN, 2x         C: AIR, 4x          
+Pre NORMAL, as loaded                9  null  -37.6 lvl 0.02 null  -26.1 lvl 0.07 null  -28.1 lvl 0.07
+Pre NORMAL, DRIVE sweep             15  null  -35.9 lvl 0.10 null  -20.1 lvl 0.13 null  -19.0 lvl 0.13
+Pre OUTPUT sweep                     2  null  -47.4 lvl 0.00 null  -28.4 lvl 0.01 null  -28.8 lvl 0.00
+COMP REDUCTION scan / as loaded     16  null  -35.7 lvl 0.12 null  -24.3 lvl 0.20 null  -25.5 lvl 0.20
+COMP calibration tries               3  null  -17.9 lvl 0.42 null  -17.5 lvl 0.42 null  -17.6 lvl 0.42
+COMP GR03/08/15                     17  null  -21.5 lvl 0.55 null  -19.4 lvl 0.55 null  -19.4 lvl 0.54
+COMP GAIN                            3  null  -17.8 lvl 0.68 null  -17.5 lvl 0.68 null  -17.6 lvl 0.68
+COMP AHEAD (no effect in Nebula)    10  null  -24.6 lvl 0.25 null  -23.2 lvl 0.29 null  -23.4 lvl 0.29
+COMP DRY 0                           2  null  -20.3 lvl 0.44 null  -19.6 lvl 0.49 null  -17.2 lvl 0.52
+COMP EMPHASIS                       17  null  -21.0 lvl 0.57 null  -17.7 lvl 0.57 null  -17.8 lvl 0.56
+COMP INPUT (= LEVEL)                 8  null  -15.1 lvl 0.69 null  -14.8 lvl 0.71 null  -14.4 lvl 0.76
+Clipper as loaded / OUTPUT          11  null  -35.0 lvl 0.11 null  -23.9 lvl 0.18 null  -27.0 lvl 0.18
+Clipper DRIVE sweep                 15  null  -10.5 lvl 0.46 null   -9.9 lvl 0.69 null   -9.0 lvl 1.07
+Chain as loaded                      9  null  -29.0 lvl 0.13 null  -21.3 lvl 0.16 null  -21.4 lvl 0.20
+Chain, Leveler at 8 dB               6  null  -18.1 lvl 0.60 null  -17.7 lvl 0.61 null  -17.9 lvl 0.60
+Pre PUSHED, as loaded                9  null  -36.1 lvl 0.04 null  -25.9 lvl 0.07 null  -28.1 lvl 0.07
+Pre PUSHED, DRIVE sweep             15  null  -36.0 lvl 0.10 null  -20.3 lvl 0.11 null  -20.4 lvl 0.11
+LIMIT REDUCTION scan / as loaded    15  null  -34.1 lvl 0.12 null  -24.1 lvl 0.18 null  -27.4 lvl 0.18
+LIMIT GR03/08/15                    19  null  -19.6 lvl 0.46 null  -18.2 lvl 0.53 null  -18.2 lvl 0.55
+LIMIT EMPHASIS                       9  null  -22.3 lvl 0.49 null  -18.8 lvl 0.49 null  -18.3 lvl 0.49
+
+B and C: the filters change the ultrasonic content on purpose, so the nulls are shallower; the level and
+gain-reduction behaviour stays the same (within about 0.1 dB). The Clipper at heavy drive differs more with
+oversampling because the Nebula clipper aliases and the oversampled one does not.
+
+Fixed in v0.2 after this comparison (v0.1 -> v0.2, same test):
+  - Leveler at PEAK REDUCTION 0 lost 0.1 dB (COMP) / 0.25 dB (LIMIT): now 0.04 / 0.07 dB; Leveler-only null -23.6 -> -47 dB.
+  - Short gain-reduction spikes (up to 17+ dB for a few ms) on drum hits and note onsets at stronger settings:
+    gone (GR15 drums: peak 14.5 dB vs Nebula 15.0). Cause: the cell-ripple model let envelope jumps through.
+  - Leveler timing refitted on bursts + drums/bass/vocal: program-material GR error 0.83/1.12/1.61 -> 0.73/0.99/1.57 dB
+    rms (COMP GR03/08/15), LIMIT 1.11 -> 0.93 dB; burst tests 0.30/0.32/0.36 -> 0.26/0.30/0.33 dB.
+  - Static curves re-matched: COMP 0.19/0.05/0.14 dB rms, LIMIT 0.35/0.22/0.27 dB (GR03/08/15).
+
+Remaining differences (known limits):
+  - Pre 2nd harmonic: same level, about 90 deg different phase. Nulls at DRIVE +15 about -20 dB, at +30 about -3..-7 dB.
+    The Nebula H2 kernel also leaves a low-frequency tail for 250 ms after loud passages (about -58 dB at the centre
+    DRIVE, -28 dB at full DRIVE); FreeLA2 has none.
+  - Leveler: on long holds it reaches its final gain reduction a little sooner (about 0.3-0.5 dB more GR in the first
+    seconds); full-scale tones from silence are grabbed harder at first (HOT section, 1 dB average); drums at GR15:
+    a bit more on kick-like hits, 2-3 dB less on snare-like hits.
+  - Clipper waveform at heavy DRIVE (level within about 0.5-1 dB).
+
+All renders, setting A (FILTER OFF, OVERSAMPLE Off):
+  Pre NORMAL, as loaded
+    pre_asloaded__CAL                  null  -48.1  level rms  0.00  p95  0.00  mean -0.00
+    pre_asloaded__LIN                  null  -33.1  level rms  0.15  p95  0.07  mean +0.04
+    pre_asloaded__LVL                  null  -34.6  level rms  0.15  p95  0.19  mean +0.04
+    pre_asloaded__ST1K                 null  -37.8  level rms  0.01  p95  0.02  mean -0.00
+    pre_asloaded__ST100                null  -31.8  level rms  0.04  p95  0.04  mean -0.00
+    pre_asloaded__ST5K                 null  -37.6  level rms  0.02  p95  0.01  mean +0.00
+    pre_asloaded__HOT                  null  -32.4  level rms  0.09  p95  0.13  mean +0.01
+    pre_asloaded__DYNS                 null  -46.8  level rms  0.01  p95  0.00  mean -0.00
+    pre_asloaded__PROG                 null  -39.1  level rms  0.02  p95  0.03  mean +0.01
+  Pre NORMAL, DRIVE sweep
+    pre_DRV_000__CAL                   null  -61.4  level rms  0.00  p95  0.00  mean -0.00
+    pre_DRV_000__LVS                   null  -40.1  level rms  0.11  p95  0.08  mean +0.02
+    pre_DRV_000__LVS1K                 null  -45.5  level rms  0.02  p95  0.03  mean +0.00
+    pre_DRV_025__CAL                   null  -58.8  level rms  0.00  p95  0.00  mean -0.00
+    pre_DRV_025__LVS                   null  -39.4  level rms  0.11  p95  0.08  mean +0.02
+    pre_DRV_025__LVS1K                 null  -44.6  level rms  0.02  p95  0.03  mean +0.00
+    pre_DRV_050__CAL                   null  -47.1  level rms  0.00  p95  0.00  mean -0.00
+    pre_DRV_050__LVS                   null  -31.6  level rms  0.12  p95  0.08  mean +0.02
+    pre_DRV_050__LVS1K                 null  -35.9  level rms  0.02  p95  0.03  mean +0.00
+    pre_DRV_075__CAL                   null  -32.9  level rms  0.01  p95  0.00  mean -0.01
+    pre_DRV_075__LVS                   null  -17.3  level rms  0.23  p95  0.13  mean +0.01
+    pre_DRV_075__LVS1K                 null  -21.4  level rms  0.10  p95  0.03  mean -0.01
+    pre_DRV_100__CAL                   null  -18.1  level rms  0.21  p95  0.02  mean -0.04
+    pre_DRV_100__LVS                   null   -3.1  level rms  0.63  p95  0.55  mean -0.02
+    pre_DRV_100__LVS1K                 null   -6.9  level rms  0.57  p95  0.43  mean -0.14
+  Pre OUTPUT sweep
+    pre_OUT_050__CAL                   null  -47.6  level rms  0.00  p95  0.00  mean -0.00
+    pre_OUT_100__CAL                   null  -47.2  level rms  0.00  p95  0.01  mean -0.00
+  COMP REDUCTION scan / as loaded
+    comp_asloaded__CAL                 null  -50.6  level rms  0.03  p95  0.03  mean +0.03
+    comp_asloaded__LIN                 null  -50.6  level rms  0.03  p95  0.03  mean +0.03
+    comp_asloaded__ST1K                null  -26.3  level rms  0.17  p95  0.34  mean -0.08
+    comp_asloaded__DYNS                null  -42.1  level rms  0.07  p95  0.08  mean -0.07
+    comp_asloaded__PROG                null  -45.4  level rms  0.05  p95  0.05  mean -0.05
+    comp_scan_000__CAL                 null  -47.0  level rms  0.04  p95  0.04  mean -0.04
+    comp_scan_010__CAL                 null  -47.4  level rms  0.04  p95  0.04  mean -0.04
+    comp_scan_020__CAL                 null  -47.8  level rms  0.04  p95  0.04  mean -0.04
+    comp_scan_030__CAL                 null  -47.7  level rms  0.04  p95  0.04  mean -0.04
+    comp_scan_040__CAL                 null  -29.3  level rms  0.20  p95  0.12  mean -0.09
+    comp_scan_050__CAL                 null  -21.2  level rms  0.46  p95  0.78  mean -0.17
+    comp_scan_060__CAL                 null  -18.0  level rms  0.58  p95  0.98  mean -0.27
+    comp_scan_070__CAL                 null  -16.2  level rms  0.65  p95  0.95  mean -0.32
+    comp_scan_080__CAL                 null  -14.2  level rms  0.69  p95  0.71  mean -0.32
+    comp_scan_090__CAL                 null  -12.0  level rms  0.73  p95  0.84  mean -0.33
+    comp_scan_100__CAL                 null  -11.0  level rms  0.63  p95  0.82  mean -0.23
+  COMP calibration tries
+    comp_GR08try1__CAL                 null  -17.1  level rms  0.91  p95  1.14  mean -0.71
+    comp_GR03try1__CAL                 null  -25.8  level rms  0.42  p95  0.55  mean -0.31
+    comp_GR15try1__CAL                 null  -17.9  level rms  0.38  p95  0.58  mean -0.08
+  COMP GR03/08/15
+    comp_GR08__CAL                     null  -17.5  level rms  0.75  p95  1.14  mean -0.46
+    comp_GR08__LVL                     null  -10.6  level rms  1.54  p95  3.42  mean +0.22
+    comp_GR08__ST1K                    null  -29.7  level rms  0.23  p95  0.56  mean -0.10
+    comp_GR08__ST100                   null  -19.4  level rms  0.57  p95  1.24  mean -0.01
+    comp_GR08__ST5K                    null  -30.1  level rms  0.29  p95  0.51  mean -0.07
+    comp_GR08__HOT                     null  -10.8  level rms  1.98  p95  4.81  mean -1.09
+    comp_GR08__DET                     null  -21.5  level rms  0.72  p95  1.39  mean -0.26
+    comp_GR08__DYN                     null  -23.2  level rms  0.28  p95  0.67  mean +0.00
+    comp_GR08__PROG                    null  -17.8  level rms  0.85  p95  2.16  mean +0.40
+    comp_GR03__CAL                     null  -27.2  level rms  0.26  p95  0.15  mean -0.09
+    comp_GR03__ST1K                    null  -30.2  level rms  0.19  p95  0.40  mean +0.01
+    comp_GR03__DYNS                    null  -30.9  level rms  0.23  p95  0.60  mean +0.11
+    comp_GR03__PROG                    null  -21.8  level rms  0.61  p95  1.13  mean +0.43
+    comp_GR15__CAL                     null  -14.8  level rms  0.55  p95  0.56  mean -0.14
+    comp_GR15__ST1K                    null  -30.0  level rms  0.37  p95  0.62  mean -0.21
+    comp_GR15__DYN                     null  -21.5  level rms  0.31  p95  0.49  mean -0.10
+    comp_GR15__PROG                    null  -13.2  level rms  1.41  p95  2.88  mean -0.31
+  COMP GAIN
+    comp_OUTPUT_000__CAL               null  -17.8  level rms  0.61  p95  0.99  mean -0.29
+    comp_OUTPUT_050__CAL               null  -17.5  level rms  0.70  p95  1.09  mean -0.43
+    comp_OUTPUT_100__CAL               null  -17.9  level rms  0.68  p95  1.12  mean -0.43
+  COMP AHEAD (no effect in Nebula)
+    comp_AHEAD_000__CAL                null  -29.2  level rms  0.24  p95  0.53  mean +0.00
+    comp_AHEAD_000__DYNS               null  -24.6  level rms  0.25  p95  0.63  mean -0.03
+    comp_AHEAD_025__CAL                null  -18.1  level rms  0.56  p95  0.90  mean -0.19
+    comp_AHEAD_025__DYNS               null  -24.6  level rms  0.25  p95  0.63  mean -0.03
+    comp_AHEAD_050__CAL                null  -18.1  level rms  0.56  p95  0.90  mean -0.19
+    comp_AHEAD_050__DYNS               null  -24.6  level rms  0.25  p95  0.63  mean -0.03
+    comp_AHEAD_075__CAL                null  -18.1  level rms  0.56  p95  0.90  mean -0.19
+    comp_AHEAD_075__DYNS               null  -24.6  level rms  0.25  p95  0.63  mean -0.03
+    comp_AHEAD_100__CAL                null  -18.1  level rms  0.56  p95  0.90  mean -0.19
+    comp_AHEAD_100__DYNS               null  -24.6  level rms  0.25  p95  0.63  mean -0.03
+  COMP DRY 0
+    comp_DRY_000__CAL                  null  -18.1  level rms  0.56  p95  0.90  mean -0.19
+    comp_DRY_000__LVS1K                null  -22.5  level rms  0.32  p95  0.50  mean -0.15
+  COMP EMPHASIS
+    comp_EMPHASIS_000__CAL             null  -17.3  level rms  0.70  p95  1.22  mean -0.37
+    comp_EMPHASIS_000__DETF            null  -21.0  level rms  0.67  p95  1.07  mean -0.55
+    comp_EMPHASIS_000__DYNF            null  -21.8  level rms  0.35  p95  0.84  mean -0.05
+    comp_EMPHASIS_000__PROG            null  -19.4  level rms  0.52  p95  0.86  mean -0.19
+    comp_EMPHASIS_025__CAL             null  -17.9  level rms  0.59  p95  1.01  mean -0.23
+    comp_EMPHASIS_025__DETF            null  -21.5  level rms  0.60  p95  1.38  mean -0.38
+    comp_EMPHASIS_025__DYNF            null  -23.3  level rms  0.31  p95  0.70  mean -0.08
+    comp_EMPHASIS_050__CAL             null  -18.0  level rms  0.57  p95  0.92  mean -0.21
+    comp_EMPHASIS_050__DETF            null  -21.0  level rms  0.61  p95  1.02  mean -0.28
+    comp_EMPHASIS_050__DYNF            null  -22.6  level rms  0.34  p95  0.76  mean -0.11
+    comp_EMPHASIS_075__CAL             null  -18.2  level rms  0.55  p95  0.83  mean -0.19
+    comp_EMPHASIS_075__DETF            null  -21.8  level rms  0.58  p95  0.97  mean -0.27
+    comp_EMPHASIS_075__DYNF            null  -23.0  level rms  0.33  p95  0.72  mean -0.13
+    comp_EMPHASIS_100__CAL             null  -18.3  level rms  0.53  p95  0.76  mean -0.18
+    comp_EMPHASIS_100__DETF            null  -21.6  level rms  0.61  p95  0.91  mean -0.27
+    comp_EMPHASIS_100__DYNF            null  -22.5  level rms  0.35  p95  0.71  mean -0.14
+    comp_EMPHASIS_100__PROG            null  -17.7  level rms  0.93  p95  2.36  mean +0.35
+  COMP INPUT (= LEVEL)
+    comp_INPUT_025__CAL                null  -17.8  level rms  0.59  p95  0.93  mean -0.25
+    comp_INPUT_025__LVS1K              null  -22.5  level rms  0.32  p95  0.50  mean -0.15
+    comp_INPUT_050__CAL                null  -14.5  level rms  0.89  p95  2.09  mean -0.53
+    comp_INPUT_050__LVS1K              null  -18.9  level rms  0.41  p95  0.48  mean +0.01
+    comp_INPUT_075__CAL                null  -14.2  level rms  0.81  p95  2.00  mean -0.48
+    comp_INPUT_075__LVS1K              null  -15.7  level rms  0.66  p95  0.72  mean +0.09
+    comp_INPUT_100__CAL                null  -14.5  level rms  0.73  p95  1.72  mean -0.44
+    comp_INPUT_100__LVS1K              null  -14.2  level rms  0.78  p95  0.96  mean +0.00
+  Clipper as loaded / OUTPUT
+    clip_asloaded__CAL                 null  -35.0  level rms  0.11  p95  0.15  mean -0.09
+    clip_asloaded__LIN                 null  -48.3  level rms  0.01  p95  0.03  mean -0.00
+    clip_asloaded__LVL                 null  -35.8  level rms  0.12  p95  0.17  mean -0.10
+    clip_asloaded__ST1K                null  -20.6  level rms  0.07  p95  0.15  mean -0.04
+    clip_asloaded__ST100               null  -30.1  level rms  0.09  p95  0.16  mean -0.02
+    clip_asloaded__ST5K                null  -20.2  level rms  0.14  p95  0.28  mean -0.00
+    clip_asloaded__HOT                 null  -33.8  level rms  0.06  p95  0.09  mean -0.05
+    clip_asloaded__PROG                null  -35.8  level rms  0.10  p95  0.15  mean -0.08
+    clip_OUT_000__CAL                  null  -35.0  level rms  0.11  p95  0.15  mean -0.09
+    clip_OUT_050__CAL                  null  -34.7  level rms  0.12  p95  0.15  mean -0.10
+    clip_OUT_100__CAL                  null  -35.0  level rms  0.11  p95  0.15  mean -0.09
+  Clipper DRIVE sweep
+    clip_IN_000__CAL                   null  -35.0  level rms  0.11  p95  0.15  mean -0.09
+    clip_IN_000__LVS                   null  -30.2  level rms  0.13  p95  0.17  mean -0.09
+    clip_IN_000__LVS1K                 null  -20.2  level rms  0.08  p95  0.14  mean -0.05
+    clip_IN_025__CAL                   null  -30.6  level rms  0.08  p95  0.10  mean -0.07
+    clip_IN_025__LVS                   null  -22.9  level rms  0.28  p95  0.73  mean +0.03
+    clip_IN_025__LVS1K                 null  -10.5  level rms  0.55  p95  1.62  mean +0.05
+    clip_IN_050__CAL                   null  -10.5  level rms  0.18  p95  0.23  mean -0.14
+    clip_IN_050__LVS                   null  -13.2  level rms  1.06  p95  1.75  mean +0.48
+    clip_IN_050__LVS1K                 null   -8.3  level rms  1.17  p95  2.31  mean +0.06
+    clip_IN_075__CAL                   null   -7.5  level rms  0.07  p95  0.08  mean +0.05
+    clip_IN_075__LVS                   null  -10.6  level rms  1.69  p95  2.42  mean +0.75
+    clip_IN_075__LVS1K                 null   -7.8  level rms  1.90  p95  2.67  mean +0.18
+    clip_IN_100__CAL                   null   -7.1  level rms  0.46  p95  0.56  mean +0.30
+    clip_IN_100__LVS                   null  -10.3  level rms  2.27  p95  2.85  mean +0.93
+    clip_IN_100__LVS1K                 null   -9.5  level rms  2.42  p95  1.27  mean -0.04
+  Chain as loaded
+    chain_asloaded__CAL                null  -22.4  level rms  0.73  p95  0.90  mean -0.72
+    chain_asloaded__LIN                null  -33.0  level rms  0.16  p95  0.24  mean -0.03
+    chain_asloaded__LVL                null  -32.5  level rms  0.18  p95  0.19  mean -0.07
+    chain_asloaded__ST1K               null  -21.0  level rms  0.10  p95  0.21  mean -0.04
+    chain_asloaded__ST100              null  -28.2  level rms  0.10  p95  0.20  mean -0.05
+    chain_asloaded__ST5K               null  -21.5  level rms  0.13  p95  0.29  mean -0.06
+    chain_asloaded__HOT                null  -29.0  level rms  0.20  p95  0.32  mean -0.18
+    chain_asloaded__DYNS               null  -32.1  level rms  0.10  p95  0.20  mean -0.09
+    chain_asloaded__PROG               null  -33.1  level rms  0.13  p95  0.20  mean -0.11
+  Chain, Leveler at 8 dB
+    chain_C08__CAL                     null  -17.4  level rms  0.58  p95  0.90  mean -0.21
+    chain_C08__LVL                     null  -10.7  level rms  1.49  p95  2.96  mean +0.17
+    chain_C08__ST1K                    null  -28.9  level rms  0.23  p95  0.58  mean -0.11
+    chain_C08__ST100                   null  -18.4  level rms  0.62  p95  1.39  mean -0.04
+    chain_C08__DYNS                    null  -24.3  level rms  0.26  p95  0.65  mean -0.05
+    chain_C08__PROG                    null  -17.7  level rms  0.84  p95  2.16  mean +0.37
+  Pre PUSHED, as loaded
+    pre_PUSHED_asloaded__CAL           null  -50.4  level rms  0.00  p95  0.00  mean -0.00
+    pre_PUSHED_asloaded__LIN           null  -33.2  level rms  0.15  p95  0.07  mean +0.04
+    pre_PUSHED_asloaded__LVL           null  -35.1  level rms  0.15  p95  0.14  mean +0.04
+    pre_PUSHED_asloaded__ST1K          null  -37.9  level rms  0.01  p95  0.02  mean -0.00
+    pre_PUSHED_asloaded__ST100         null  -31.8  level rms  0.04  p95  0.04  mean -0.00
+    pre_PUSHED_asloaded__ST5K          null  -37.8  level rms  0.02  p95  0.01  mean +0.00
+    pre_PUSHED_asloaded__HOT           null  -32.7  level rms  0.09  p95  0.13  mean +0.01
+    pre_PUSHED_asloaded__DYNS          null  -50.0  level rms  0.01  p95  0.00  mean -0.00
+    pre_PUSHED_asloaded__PROG          null  -36.1  level rms  0.05  p95  0.11  mean +0.02
+  Pre PUSHED, DRIVE sweep
+    pre_PUSHED_DRV_000__CAL            null  -61.4  level rms  0.00  p95  0.00  mean -0.00
+    pre_PUSHED_DRV_000__LVS            null  -40.1  level rms  0.11  p95  0.08  mean +0.02
+    pre_PUSHED_DRV_000__LVS1K          null  -45.5  level rms  0.02  p95  0.03  mean +0.00
+    pre_PUSHED_DRV_025__CAL            null  -60.1  level rms  0.00  p95  0.00  mean -0.00
+    pre_PUSHED_DRV_025__LVS            null  -39.4  level rms  0.11  p95  0.08  mean +0.02
+    pre_PUSHED_DRV_025__LVS1K          null  -44.6  level rms  0.02  p95  0.03  mean +0.00
+    pre_PUSHED_DRV_050__CAL            null  -50.4  level rms  0.00  p95  0.00  mean -0.00
+    pre_PUSHED_DRV_050__LVS            null  -31.7  level rms  0.12  p95  0.08  mean +0.02
+    pre_PUSHED_DRV_050__LVS1K          null  -36.0  level rms  0.02  p95  0.03  mean +0.00
+    pre_PUSHED_DRV_075__CAL            null  -35.8  level rms  0.01  p95  0.00  mean -0.00
+    pre_PUSHED_DRV_075__LVS            null  -17.4  level rms  0.21  p95  0.18  mean +0.01
+    pre_PUSHED_DRV_075__LVS1K          null  -21.5  level rms  0.10  p95  0.03  mean -0.01
+    pre_PUSHED_DRV_100__CAL            null  -20.8  level rms  0.11  p95  0.00  mean -0.02
+    pre_PUSHED_DRV_100__LVS            null   -3.1  level rms  0.49  p95  0.57  mean -0.04
+    pre_PUSHED_DRV_100__LVS1K          null   -7.0  level rms  0.55  p95  0.15  mean -0.08
+  LIMIT REDUCTION scan / as loaded
+    comp_LIMIT_asloaded__CAL           null  -63.6  level rms  0.01  p95  0.01  mean -0.01
+    comp_LIMIT_asloaded__ST1K          null  -16.6  level rms  0.46  p95  0.96  mean -0.22
+    comp_LIMIT_asloaded__DYNS          null  -38.3  level rms  0.10  p95  0.12  mean -0.10
+    comp_LIMIT_asloaded__PROG          null  -40.8  level rms  0.08  p95  0.09  mean -0.08
+    comp_LIMIT_scan_000__CAL           null  -41.8  level rms  0.07  p95  0.07  mean -0.07
+    comp_LIMIT_scan_010__CAL           null  -42.1  level rms  0.07  p95  0.07  mean -0.07
+    comp_LIMIT_scan_020__CAL           null  -42.6  level rms  0.07  p95  0.07  mean -0.07
+    comp_LIMIT_scan_030__CAL           null  -41.9  level rms  0.07  p95  0.07  mean -0.07
+    comp_LIMIT_scan_040__CAL           null  -34.1  level rms  0.12  p95  0.06  mean -0.04
+    comp_LIMIT_scan_050__CAL           null  -23.9  level rms  0.32  p95  0.49  mean -0.11
+    comp_LIMIT_scan_060__CAL           null  -19.6  level rms  0.49  p95  0.85  mean -0.26
+    comp_LIMIT_scan_070__CAL           null  -18.7  level rms  0.46  p95  0.50  mean -0.25
+    comp_LIMIT_scan_080__CAL           null  -15.0  level rms  0.53  p95  0.70  mean -0.20
+    comp_LIMIT_scan_090__CAL           null  -10.0  level rms  0.74  p95  0.93  mean -0.19
+    comp_LIMIT_scan_100__CAL           null   -6.9  level rms  1.01  p95  1.33  mean -0.11
+  LIMIT GR03/08/15
+    comp_LIMIT_GR08try1__CAL           null  -17.9  level rms  0.95  p95  1.26  mean -0.76
+    comp_LIMIT_GR08try2__CAL           null  -19.6  level rms  0.55  p95  0.76  mean -0.27
+    comp_LIMIT_GR03try1__CAL           null  -27.5  level rms  0.35  p95  0.48  mean -0.18
+    comp_LIMIT_GR15try1__CAL           null  -18.5  level rms  0.25  p95  0.27  mean -0.07
+    comp_LIMIT_GR08__CAL               null  -19.1  level rms  0.64  p95  0.77  mean -0.36
+    comp_LIMIT_GR08__LVL               null  -10.9  level rms  1.48  p95  3.06  mean +0.12
+    comp_LIMIT_GR08__ST1K              null  -26.3  level rms  0.31  p95  0.67  mean -0.13
+    comp_LIMIT_GR08__ST100             null  -14.5  level rms  0.99  p95  2.40  mean -0.34
+    comp_LIMIT_GR08__ST5K              null  -23.6  level rms  0.46  p95  0.80  mean -0.03
+    comp_LIMIT_GR08__HOT               null   -9.0  level rms  2.51  p95  6.57  mean -1.10
+    comp_LIMIT_GR08__DET               null  -19.6  level rms  0.97  p95  1.59  mean -0.32
+    comp_LIMIT_GR08__DYN               null  -21.9  level rms  0.24  p95  0.39  mean -0.02
+    comp_LIMIT_GR08__PROG              null  -18.2  level rms  0.78  p95  1.98  mean +0.36
+    comp_LIMIT_GR03__CAL               null  -27.7  level rms  0.27  p95  0.28  mean -0.07
+    comp_LIMIT_GR03__ST1K              null  -27.1  level rms  0.25  p95  0.55  mean -0.06
+    comp_LIMIT_GR03__DYNS              null  -31.7  level rms  0.15  p95  0.35  mean +0.05
+    comp_LIMIT_GR15__CAL               null  -16.5  level rms  0.45  p95  0.48  mean -0.18
+    comp_LIMIT_GR15__ST1K              null  -24.7  level rms  0.54  p95  0.78  mean -0.34
+    comp_LIMIT_GR15__DYNS              null  -18.6  level rms  0.37  p95  0.66  mean -0.12
+  LIMIT EMPHASIS
+    comp_LIMIT_EMPHASIS_000__CAL       null  -18.6  level rms  0.58  p95  0.95  mean -0.22
+    comp_LIMIT_EMPHASIS_000__DETF      null  -23.0  level rms  0.52  p95  0.90  mean -0.32
+    comp_LIMIT_EMPHASIS_000__DYNF      null  -23.6  level rms  0.26  p95  0.74  mean -0.11
+    comp_LIMIT_EMPHASIS_050__CAL       null  -19.3  level rms  0.49  p95  0.75  mean -0.17
+    comp_LIMIT_EMPHASIS_050__DETF      null  -21.2  level rms  0.59  p95  1.26  mean -0.20
+    comp_LIMIT_EMPHASIS_050__DYNF      null  -22.3  level rms  0.35  p95  0.69  mean -0.18
+    comp_LIMIT_EMPHASIS_100__CAL       null  -19.7  level rms  0.46  p95  0.59  mean -0.21
+    comp_LIMIT_EMPHASIS_100__DETF      null  -23.3  level rms  0.49  p95  0.75  mean -0.16
+    comp_LIMIT_EMPHASIS_100__DYNF      null  -23.9  level rms  0.33  p95  0.62  mean -0.21
