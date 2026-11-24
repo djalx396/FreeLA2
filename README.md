@@ -1,4 +1,4 @@
-# FreeLA2 v0.3.1
+# FreeLA2 v0.3.2
 
 An optical leveling amplifier modelled on Chris's Acustica OPTO-3A/2A Nebula set (the LA-2A model):
 **PREAMP > LEVELING AMPLIFIER > CLIPPER** in one plug-in, fitted to 219 captures at 96 kHz.
@@ -47,6 +47,11 @@ VST3 + AU, universal macOS (Apple Silicon + Intel). The top bar shows the versio
 **CLIPPER**
 - **DRIVE** 0-40: clipping starts at about (+2 - DRIVE) dBFS; the level is compensated below the onset.
 - **OUTPUT** 0-10 dB. **CLIP** lamp lights while it clips.
+
+## Changes in v0.3.2
+- Stage switches for null tests and capture kits: host parameters "Pre Stage", "Leveler Stage" and "Clipper Stage"
+  (on by default; not on the panel). With all three off, FreeLA2 passes the input through, delayed by its latency.
+  Used by the FreeLA2 capture kit to render each stage alone, like the Nebula passes.
 
 ## Changes in v0.3.1
 - Fix: the plug-in now loads on macOS 11 (Big Sur) and later, Intel and Apple Silicon. v0.1-v0.3 were built for the

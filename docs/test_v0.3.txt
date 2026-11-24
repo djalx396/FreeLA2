@@ -1,4 +1,4 @@
-FreeLA2 v0.3.0  build test
+FreeLA2 v0.3.2  build test
   latency 32 samples
   ok   OS 1x, filter 0: level -13.00 dB, GR 0.00 dB, latency 32
   ok   OS 1x, filter 1: level -13.00 dB, GR 0.00 dB, latency 32
@@ -17,6 +17,7 @@ FreeLA2 v0.3.0  build test
   ok   AHEAD 3 ms adds 288 samples
   ok   Leveler Mix 0 = Preamp straight into the Clipper: -152.1 dB
   ok   Leveler Mix 50 % = half compressed + half dry: -76.3 dB
+  ok   stage switches all off = input delayed by the latency: -300.0 dB
   ok   mono at 44.1 kHz
   ok   192 kHz: 8x falls back to 4x
   ok   state saves and reloads

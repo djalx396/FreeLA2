@@ -43,6 +43,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout FreeLA2Processor::createLayo
     c (ID::meter, "Meter", { "GR", "OUT" }, 0, false);
     c (ID::finish, "Finish", { "Enamel", "Hammertone", "Midnight" }, 0, false);
     c (ID::phase, "Filter Phase", { "ANALOG", "LINEAR" }, 0, false);
+    // stage switches for null tests / capture kits (host parameters only, not on the panel)
+    v.push_back (std::make_unique<APB> (juce::ParameterID { ID::prestage, 1 }, "Pre Stage", true));
+    v.push_back (std::make_unique<APB> (juce::ParameterID { ID::levstage, 1 }, "Leveler Stage", true));
+    v.push_back (std::make_unique<APB> (juce::ParameterID { ID::clipstage, 1 }, "Clipper Stage", true));
     return { v.begin(), v.end() };
 }
 
@@ -53,7 +57,8 @@ FreeLA2Processor::FreeLA2Processor()
       apvts (*this, nullptr, "FreeLA2", createLayout())
 {
     const juce::String ids[pCount] = { ID::power, ID::pushed, ID::drive, ID::level, ID::limit, ID::reduction,
-        ID::emphasis, ID::gain, ID::ahead, ID::clipdrive, ID::clipout, ID::mix, ID::filter, ID::oslive, ID::osrender, ID::rendermode, ID::phase };
+        ID::emphasis, ID::gain, ID::ahead, ID::clipdrive, ID::clipout, ID::mix, ID::filter, ID::oslive, ID::osrender, ID::rendermode, ID::phase,
+        ID::prestage, ID::levstage, ID::clipstage };
     for (int i = 0; i < pCount; ++i) p[i] = apvts.getRawParameterValue (ids[i]);
     model = la2::makeModel();
 }
@@ -69,7 +74,9 @@ la2::Settings FreeLA2Processor::readSettings() const
 {
     la2::Settings s;
     const int st = testStages.load();
-    s.preOn = (st & 1) != 0; s.compOn = (st & 2) != 0; s.clipOn = (st & 4) != 0;
+    s.preOn  = (st & 1) != 0 && p[pPreStage]->load() > 0.5f;
+    s.compOn = (st & 2) != 0 && p[pLevStage]->load() > 0.5f;
+    s.clipOn = (st & 4) != 0 && p[pClipStage]->load() > 0.5f;
     s.pushed     = juce::roundToInt (p[pPushed]->load()) == 1;
     s.drive      = p[pDrive]->load();
     s.levelDb    = p[pLevel]->load();

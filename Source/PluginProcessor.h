@@ -14,7 +14,7 @@ namespace ID
         limit { "limit" }, reduction { "reduction" }, emphasis { "emphasis" }, gain { "gain" },
         ahead { "ahead" }, clipdrive { "clipdrive" }, clipout { "clipout" }, mix { "mix" }, filter { "filter" },
         oslive { "oslive" }, osrender { "osrender" }, rendermode { "rendermode" }, meter { "meter" }, finish { "finish" },
-        phase { "phase" };
+        phase { "phase" }, prestage { "prestage" }, levstage { "levstage" }, clipstage { "clipstage" };
 }
 
 class FreeLA2Processor : public juce::AudioProcessor
@@ -61,7 +61,7 @@ public:
     static juce::String versionString() { return juce::String ("v") + JucePlugin_VersionString + "  build " + FREELA2_BUILD; }
 
     enum PIdx { pPower, pPushed, pDrive, pLevel, pLimit, pReduction, pEmphasis, pGain, pAhead, pClipDrive, pClipOut,
-                pMix, pFilter, pOsLive, pOsRender, pRenderMode, pPhase, pCount };
+                pMix, pFilter, pOsLive, pOsRender, pRenderMode, pPhase, pPreStage, pLevStage, pClipStage, pCount };
     static constexpr double kAheadMs[5] = { 0.0, 1.5, 3.0, 4.5, 6.0 };
 
 private:

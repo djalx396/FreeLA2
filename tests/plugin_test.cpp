@@ -118,6 +118,16 @@ int main()
         check (10 * std::log10 (d2 / r2 + 1e-30) < -50, "Leveler Mix 50 % = half compressed + half dry: " + juce::String (10 * std::log10 (d2 / r2 + 1e-30), 1) + " dB");
         setParam (p, ID::mix, 100.f);
     }
+    // 4b) all three stage switches off = the input, delayed by the reported latency (null-test path)
+    {
+        FreeLA2Processor p; p.setPlayConfigDetails (2, 2, fs, block);
+        setParam (p, ID::prestage, 0.f); setParam (p, ID::levstage, 0.f); setParam (p, ID::clipstage, 0.f);
+        setParam (p, ID::filter, 0.f); setParam (p, ID::oslive, 0.f); setParam (p, ID::reduction, 60.f);
+        p.prepareToPlay (fs, block);
+        auto y = run (p, pinkL, pinkR, block, 2); const int lat = p.getLatencySamples();
+        double d = 0, r = 0; for (int i = 48000; i < N - lat; ++i) { const double v = y[(size_t) (i + lat)] - pinkL[(size_t) i]; d += v * v; r += (double) pinkL[(size_t) i] * pinkL[(size_t) i]; }
+        check (10 * std::log10 (d / r + 1e-30) < -100, "stage switches all off = input delayed by the latency: " + juce::String (10 * std::log10 (d / r + 1e-30), 1) + " dB");
+    }
     // 5) mono layout, 44.1 and 192 kHz, state round trip
     {
         FreeLA2Processor p; p.setPlayConfigDetails (1, 1, 44100, block); p.prepareToPlay (44100, block);
