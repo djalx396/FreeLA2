@@ -24,7 +24,8 @@ namespace M
     // LF: two analog sections (fz qz fp qp each): section 1 = [lfF, lfQ, 34, 35], section 2 = [36 .. 39]
     constexpr int lf1fp = 34, lf1qp = 35, lf2fz = 36, lf2qz = 37, lf2fp = 38, lf2qp = 39;
     constexpr int preTrimDb = 43, preDelayUs = 44;
-    constexpr int ripHpF = 45;      // ripple high-pass (Hz): the cell ripple follows the waveform, not envelope jumps (0 = off) // fixed gain and sub-sample delay of the Nebula Pre
+    constexpr int ripHpF = 45;      // ripple high-pass (Hz): the cell ripple follows the waveform, not envelope jumps (0 = off)
+    constexpr int ripGate = 46;     // v0.4: ripple only while the input envelope is steady; width of the gate (ln units, 0 = off)
     // Clipper
     constexpr int clipC = 40, clipN = 41, clipLeak = 42;
     // EMPHASIS: 5 points (0, .25, .5, .75, 1) x (fc Hz, low-band weight, low-band attack ms)
@@ -253,7 +254,7 @@ public:
             lf[c].reset(); lfSh[c].reset(); hfFir[c].reset(); h2shelf[c].reset(); h2hp1[c].reset(); h2hp2[c].reset(); env[c] = 0;
             bl[c].reset(); aheadDel[c].reset(); preByp[c].reset(); g2Cache[c] = 1; g2Count[c] = 0;
         }
-        ripEnv = 0; ripLp.reset(); ripHp1.reset(); ripHp2.reset(); kr = 0;
+        ripEnv = 0; ripS2 = 0; ripS3 = 0; ripLp.reset(); ripHp1.reset(); ripHp2.reset(); kr = 0;
         msH = msL = pkH = pkL = 0; lfSm = 0; split.reset(); G1 = G2 = G3 = 0;
         gPrev = gNow = 1.0; tick = 0; grOut = 0;
     }
@@ -357,6 +358,16 @@ public:
                     ripEnv += cRipEnv * (ar - ripEnv);
                     double rel = ripEnv > 1e-9 ? ar / ripEnv - 1.0 : 0.0;
                     rel = std::max (-1.0, std::min (3.0, rel));
+                    if (ripGateW > 0)
+                    {
+                        // v0.4: the ripple is the cell following the waveform of a steady tone. On an onset or a drop the
+                        // ratio above jumps (the envelope lags), which made every attack wobble by a few dB. Two slower
+                        // envelopes tell whether the level is steady; the ripple fades out while it is moving.
+                        ripS2 += cRipS * (ripEnv - ripS2); ripS3 += cRipS * (ripS2 - ripS3);
+                        const double dl = ripS3 > 1e-9 ? std::log ((ripS2 + 1e-12) / ripS3) * invRipGate : 0.0;
+                        const double d2 = dl * dl;
+                        rel *= 1.0 / (1.0 + d2 * d2);
+                    }
                     if (ripHpOn) rel = ripHp2.process (ripHp1.process (rel));        // keep only the waveform ripple
                     rg = std::exp (-0.11512925464970229 * kr * ripLp.process (rel));
                 }
@@ -454,6 +465,7 @@ private:
         d3a = P[I::d3a]; d3p = P[I::d3p]; d3cap = P[I::d3cap];
         ripLp.setHzLP (std::max (1.0, P[I::d3fc]), fo); cRipEnv = 1.0 - std::exp (-1.0 / (0.02 * fo));
         ripHpOn = model[M::ripHpF] > 0;
+        ripGateW = model[M::ripGate]; invRipGate = ripGateW > 0 ? 1.0 / ripGateW : 0.0; cRipS = 1.0 - std::exp (-1.0 / (0.03 * fo));
         if (ripHpOn) { ripHp1.highpass (model[M::ripHpF], 0.5412, fo); ripHp2.highpass (model[M::ripHpF], 1.3066, fo); }
         if (reset) { G1 = G2 = G3 = 0; }
     }
@@ -496,6 +508,7 @@ private:
     // Pre
     Biquad lf[2], lfSh[2], h2shelf[2], h2hp1[2], h2hp2[2]; SymFir hfFir[2]; double env[2] {}, envRelC = 0.999, preTrim = 1;
     OnePole ripLp; Biquad ripHp1, ripHp2; bool ripHpOn = false; double d3a = 0, d3p = 2, d3cap = 0, kr = 0, ripEnv = 0, cRipEnv = 0.001;
+    double ripS2 = 0, ripS3 = 0, cRipS = 0.001, ripGateW = 0, invRipGate = 0;
     double level = 1, k2 = 0, k3 = 0, tLevel = 1, tK2 = 0, sm = 0.001;
     double tGOut = 1, tCg = 1, tCOut = 1, tMix = 1, grMax = 0, clipMax = 0;
     double g2Cache[2] { 1, 1 }; unsigned g2Count[2] { 0, 0 };

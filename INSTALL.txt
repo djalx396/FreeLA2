@@ -1,4 +1,4 @@
-FreeLA2 v0.3.2 - install and build
+FreeLA2 v0.4.0 - install and build
 ======================================
 
 A) Build it on GitHub (same as RBA-6A / FreeBass)
@@ -6,7 +6,7 @@ A) Build it on GitHub (same as RBA-6A / FreeBass)
    "Upload files", drag in everything inside the FreeLA2 folder, Commit). The workflow is already there, so the
    build starts by itself; skip to step 5. For a new repository:
    1. On github.com, create a new PUBLIC repository named FreeLA2 (no README).
-   2. Unzip FreeLA2-source-v0.3.2.zip on your Mac. Open the FreeLA2 folder.
+   2. Unzip FreeLA2-source-v0.4.0.zip on your Mac. Open the FreeLA2 folder.
    3. In the new repository: "uploading an existing file", drag in EVERYTHING inside the FreeLA2 folder
       (the files and the folders Source, tools, tests, fit, docs, github). Commit.
    4. The web upload skips the hidden .github folder, so create the workflow by hand:

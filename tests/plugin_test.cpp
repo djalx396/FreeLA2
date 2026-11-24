@@ -128,6 +128,28 @@ int main()
         double d = 0, r = 0; for (int i = 48000; i < N - lat; ++i) { const double v = y[(size_t) (i + lat)] - pinkL[(size_t) i]; d += v * v; r += (double) pinkL[(size_t) i] * pinkL[(size_t) i]; }
         check (10 * std::log10 (d / r + 1e-30) < -100, "stage switches all off = input delayed by the latency: " + juce::String (10 * std::log10 (d / r + 1e-30), 1) + " dB");
     }
+    // 4c) v0.4: the Leveler attack rises smoothly (v0.3 wobbled by 2-4 dB in the first 50 ms: the cell-ripple model
+    //     reacted to the onset itself). 1 kHz at -30 dBFS, then a step to 0 dBFS; GR in 2 ms windows for 150 ms.
+    {
+        FreeLA2Processor p; p.setPlayConfigDetails (2, 2, fs, block);
+        setParam (p, ID::prestage, 0.f); setParam (p, ID::clipstage, 0.f); setParam (p, ID::reduction, 56.f);
+        setParam (p, ID::filter, 0.f); setParam (p, ID::oslive, 0.f);
+        p.prepareToPlay (fs, block);
+        const int n = (int) fs * 2, st = (int) fs;
+        std::vector<float> x ((size_t) n);
+        for (int i = 0; i < n; ++i) x[(size_t) i] = (float) ((i < st ? 0.0316227766 : 1.0) * std::sin (2 * juce::MathConstants<double>::pi * 1000.0 * i / fs));
+        auto y = run (p, x, x, block, 2); const int lat = p.getLatencySamples();
+        const int w = (int) (0.002 * fs); double prev = 0, worstDrop = 0, last = 0;
+        for (int k = 0; k < 75; ++k)
+        {
+            const size_t a = (size_t) (st + k * w);
+            const double gr = rmsDb (x, a, a + (size_t) w) - rmsDb (y, a + (size_t) lat, a + (size_t) (lat + w));
+            if (k > 0) worstDrop = std::max (worstDrop, prev - gr);
+            prev = gr; last = gr;
+        }
+        check (worstDrop < 0.3 && last > 10, "Leveler attack rises smoothly: largest dip " + juce::String (worstDrop, 2) + " dB, "
+               + juce::String (last, 1) + " dB GR after 150 ms");
+    }
     // 5) mono layout, 44.1 and 192 kHz, state round trip
     {
         FreeLA2Processor p; p.setPlayConfigDetails (1, 1, 44100, block); p.prepareToPlay (44100, block);

@@ -25,7 +25,7 @@ def build(over=None):
     m[la2.g2Tab:la2.g2Tab + 24] = ph['g2']
     cl = J('clip.json', dict(c=1.5, n=4.0, leak=0.0))
     m[la2.clipC], m[la2.clipN], m[42] = cl['c'], cl['n'], cl.get('leak', 0.0)
-    m[45] = J('ripple.json', dict(hpF=0.0))['hpF']
+    rp = J('ripple.json', dict(hpF=0.0)); m[45] = rp['hpF']; m[46] = rp.get('gate', 0.0)
     em = J('emph.json', dict(pts=[[1, 1, 0], [60, 0.5, 30], [120, 0.3, 60], [200, 0.2, 80], [300, 0.15, 100]]))
     for k, (fc, wl, tl) in enumerate(em['pts']):
         m[la2.EMPH + 3 * k: la2.EMPH + 3 * k + 3] = [fc, wl, tl]

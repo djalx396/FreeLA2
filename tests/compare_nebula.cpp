@@ -5,17 +5,21 @@
 // jobs file, one job per line:
 //   <in.f32> <out.f32> <frames> stages=<1 Pre | 2 Leveler | 4 Clipper> <param id>=<value> ...
 // in/out: raw interleaved stereo float32. The output is latency-compensated (same length as the input).
-// The first line may be:  global oslive=<0..3> filter=<0..2> rate=<Hz>   (set before prepareToPlay)
+// The first line may be:  global oslive=<0..3> filter=<0..2> rate=<Hz> [reset=1]   (set before prepareToPlay;
+// reset=1 calls prepareToPlay again before every job, which is what REAPER does at the start of each render)
 #include "../Source/PluginProcessor.h"
 #include <fstream>
 #include <iostream>
 #include <sstream>
 
-static void setParam (FreeLA2Processor& p, const juce::String& id, float v)
+static void setParam (FreeLA2Processor& p, const juce::String& idIn, float v)
 {
+    // "@id=value" sets the normalised (0..1) value directly, the way a host does (used to replay REAPER read-backs)
+    const bool norm = idIn.startsWith ("@");
+    const auto id = norm ? idIn.substring (1) : idIn;
     auto* prm = p.apvts.getParameter (id);
     if (prm == nullptr) { std::cerr << "unknown parameter " << id << std::endl; std::exit (2); }
-    prm->setValueNotifyingHost (prm->convertTo0to1 (v));
+    prm->setValueNotifyingHost (norm ? v : prm->convertTo0to1 (v));
 }
 
 int main (int argc, char** argv)
@@ -28,6 +32,7 @@ int main (int argc, char** argv)
     while (std::getline (jf, line)) if (! line.empty()) lines.push_back (line);
 
     double rate = 96000; const int block = 512;
+    bool resetEach = false;     // global reset=1: prepareToPlay before every job, the way REAPER starts each render
     FreeLA2Processor p;
     setParam (p, ID::rendermode, 2.f);      // Never: always the live oversampling setting
     setParam (p, ID::oslive, 0.f);
@@ -39,7 +44,7 @@ int main (int argc, char** argv)
         while (in >> tok)
         {
             const auto eq = tok.find ('='); const auto k = tok.substr (0, eq); const float v = std::stof (tok.substr (eq + 1));
-            if (k == "rate") rate = v; else setParam (p, k, v);
+            if (k == "rate") rate = v; else if (k == "reset") resetEach = v > 0.5f; else setParam (p, k, v);
         }
         first = 1;
     }
@@ -60,6 +65,7 @@ int main (int argc, char** argv)
             const auto eq = tok.find ('='); const auto k = tok.substr (0, eq); const float v = std::stof (tok.substr (eq + 1));
             if (k == "stages") p.testStages = (int) v; else setParam (p, k, v);
         }
+        if (resetEach) p.prepareToPlay (rate, block);
         std::vector<float> x ((size_t) frames * 2);
         { std::ifstream f (inPath, std::ios::binary); f.read ((char*) x.data(), (std::streamsize) (x.size() * sizeof (float))); }
         std::vector<float> y ((size_t) frames * 2, 0.f);

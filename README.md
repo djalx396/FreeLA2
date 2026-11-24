@@ -1,4 +1,4 @@
-# FreeLA2 v0.3.2
+# FreeLA2 v0.4.0
 
 An optical leveling amplifier modelled on Chris's Acustica OPTO-3A/2A Nebula set (the LA-2A model):
 **PREAMP > LEVELING AMPLIFIER > CLIPPER** in one plug-in, fitted to 219 captures at 96 kHz.
@@ -48,6 +48,18 @@ VST3 + AU, universal macOS (Apple Silicon + Intel). The top bar shows the versio
 - **DRIVE** 0-40: clipping starts at about (+2 - DRIVE) dBFS; the level is compensated below the onset.
 - **OUTPUT** 0-10 dB. **CLIP** lamp lights while it clips.
 
+## Changes in v0.4.0
+- Leveler attack: smooth again. In v0.3.x the gain-cell ripple model (the bit that makes the opto distort low notes a
+  little while it compresses) also reacted to every onset, so the gain reduction overshot and dipped by 2-4 dB in the
+  first 50 ms of each attack (worst with lots of reduction). The Nebula rises smoothly. The ripple now works only while
+  the input level is steady, which is where the real cell ripple lives; on onsets and drops it fades out.
+  Steady tones are unchanged (same low-frequency distortion), attacks now rise without the wobble.
+- Checked against Chris's own REAPER captures of v0.3.2 on the Mac (226 renders): the Mac build gives the same output
+  as the reference build here (median -116 dB, worst -81 dB; the rest is the 24-bit render floor). Results against
+  the Nebula: docs/test_v0.4_vs_nebula.txt.
+- Note for null tests: REAPER restarts the plug-in at the start of every render, so each render starts from rest
+  (no gain reduction left over from the previous render). In normal playback nothing is restarted.
+
 ## Changes in v0.3.2
 - Stage switches for null tests and capture kits: host parameters "Pre Stage", "Leveler Stage" and "Clipper Stage"
   (on by default; not on the panel). With all three off, FreeLA2 passes the input through, delayed by its latency.
@@ -81,14 +93,19 @@ VST3 + AU, universal macOS (Apple Silicon + Intel). The top bar shows the versio
   within about 0.6 dB rms. Leveler alone at PEAK REDUCTION 0: -42 to -50 dB. Program material (drums, bass, vocal):
   gain-reduction error 0.7-1.6 dB rms, the vocal within about 0.5 dB. Full results: `docs/test_v0.2_vs_nebula.txt`.
 
-## Known limits of v0.3 (unchanged from v0.2)
+## Known limits (measured on Chris's REAPER captures, v0.4)
 - The Pre's 2nd harmonic has a different phase from the Nebula's (same level), so nulls at high DRIVE are limited
   (about -20 dB at DRIVE +15, -3 to -7 dB at +30). The Nebula also leaves a short low-frequency tail after loud
   passages at high DRIVE (250 ms, -28 dB at full DRIVE); FreeLA2 does not.
 - NORMAL's low-level 2nd harmonic at 100 Hz is up to 8 dB higher than the Nebula's (around -80 dBc).
-- Leveler: on long holds it reaches its final gain reduction a little sooner; full-scale tones from silence are
-  grabbed harder at first; on drums at strong settings a bit more on kick-like hits, 2-3 dB less on snare-like hits.
-- Clipper waveform at heavy DRIVE (level within about 0.5-1 dB).
+- Leveler: coming out of a very quiet passage (around -50 dBFS) the Nebula waits 20-30 ms before it grabs; FreeLA2
+  grabs at once. A bass note from silence: the Nebula reaches half its reduction after about 100 ms, FreeLA2 takes a
+  first bite at once and then follows slowly. On the drum loop at 8 dB FreeLA2 grabs the start of a hit harder and lets
+  go sooner (about 1 dB less reduction on average across the loop).
+- Clipper at heavy DRIVE (20 dB and more): the Nebula's clipper is frequency dependent there (10 kHz squashed about
+  2 dB more, 100 Hz 0.8 dB more, 1-2 kHz 0.2 dB less) and shifts the phase of what it clips by up to 15 deg around
+  500 Hz-1 kHz. That comes from the Nebula's level-dependent kernels and cannot be done by a clipper without extra
+  latency. Nulls -5 to -12 dB at 20-40 dB of DRIVE; -20 to -35 dB as loaded and at light DRIVE.
 
 ## Latency
 Fixed in every OVERSAMPLE and FILTER setting: 32 samples at 96 kHz in ANALOG, 120 in LINEAR, plus AHEAD when used.
@@ -102,8 +119,9 @@ Reported to the host.
 - `Source/PluginProcessor.*`, `Source/PluginEditor.*` - the plug-in and GUI.
 - `tests/plugin_test.cpp` - local test (cmake -DFLA2_BUILD_TESTS=ON). `tests/compare_nebula.cpp` + `fit/compare_nebula.py`
   - runs the plug-in over the Nebula capture signals and compares. `fit/` - the Python fitting scripts (reference).
-- `docs/test_v0.3.txt` - plug-in test results; `docs/test_v0.3_vs_nebula.txt` and `docs/test_v0.2_vs_nebula.txt` -
-  the comparisons with the Nebula (the v0.2 file has every render listed); `docs/gui_v0.3.png` - GUI snapshot.
+- `docs/test_v0.4.txt` - plug-in test results; `docs/test_v0.4_vs_nebula.txt` - Chris's REAPER captures against the
+  Nebula, every render listed (older: `docs/test_v0.3_vs_nebula.txt`, `docs/test_v0.2_vs_nebula.txt`);
+  `docs/gui_v0.3.png` - GUI snapshot.
 
 ## Credits
 - Ultrasonic filter sections: Airwindows Hypersonic / HypersonX / UltrasonX by Chris Johnson, MIT licence (`docs/airwindows-LICENSE.txt`).

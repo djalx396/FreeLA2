@@ -1,0 +1,289 @@
+FreeLA2 against the Nebula OPTO-2A, measured on Chris's REAPER captures (2026-11-24)
+====================================================================================
+
+1) The Mac build is the build that was tested
+   Chris rendered FreeLA2 v0.3.2 (Apple Silicon, REAPER 7.61) with the FreeLA2 capture kit: 212 null-test renders
+   + 14 with FILTER CLEAN 2x (ANALOG and LINEAR). Every render was replayed through the reference build here with the
+   exact parameter values REAPER read back. Mac vs reference: median -116 dB, worst -81 dB (24-bit render floor;
+   the worst cases are the Preamp at full DRIVE, where the two processors round slightly differently).
+   REAPER restarts the plug-in at the start of every render (prepareToPlay), so each render starts from rest.
+   The Nebula renders kept part of the previous render's gain reduction (about 0.2-0.35 dB at the start).
+
+2) Null tests against the Nebula (null = residual vs the Nebula output in dB, lower is closer; lvl = rms of the
+   level / gain-reduction difference in 50 ms windows while the signal plays, dB). First second skipped.
+   v0.3 harness = the earlier test here (state carried over between renders); Mac v0.3.2 = Chris's renders;
+   v0.4 = this build, simulated the way REAPER renders (for v0.3.2 this matches the Mac renders to the 24-bit floor, see 1).
+
+group (median)                         n  v0.3 harness         Mac v0.3.2 renders   v0.4                
+Pre NORMAL, as loaded                  9  null  -37.6 lvl 0.02  null  -37.6 lvl 0.02  null  -37.6 lvl 0.02
+Pre NORMAL, DRIVE sweep               15  null  -35.9 lvl 0.10  null  -35.9 lvl 0.10  null  -35.9 lvl 0.10
+Pre OUTPUT sweep                       2  null  -47.4 lvl 0.00  null  -47.4 lvl 0.00  null  -47.4 lvl 0.00
+COMP REDUCTION scan / as loaded       16  null  -35.7 lvl 0.12  null  -40.0 lvl 0.10  null  -40.0 lvl 0.10
+COMP calibration tries                 3  null  -17.9 lvl 0.42  null  -19.0 lvl 0.36  null  -19.1 lvl 0.38
+COMP GR03/08/15                       17  null  -21.5 lvl 0.55  null  -21.5 lvl 0.54  null  -21.5 lvl 0.54
+COMP GAIN                              3  null  -17.8 lvl 0.68  null  -18.4 lvl 0.56  null  -18.4 lvl 0.56
+COMP AHEAD (no effect in Nebula)      10  null  -24.6 lvl 0.25  null  -25.5 lvl 0.40  null  -25.5 lvl 0.40
+COMP DRY 0                             2  null  -20.3 lvl 0.44  null  -20.5 lvl 0.44  null  -22.6 lvl 0.44
+COMP EMPHASIS                         17  null  -21.0 lvl 0.57  null  -20.8 lvl 0.55  null  -20.8 lvl 0.55
+COMP INPUT (= LEVEL)                   8  null  -15.1 lvl 0.69  null  -15.4 lvl 0.60  null  -16.9 lvl 0.59
+Clipper as loaded / OUTPUT            11  null  -35.0 lvl 0.11  null  -35.0 lvl 0.11  null  -35.0 lvl 0.11
+Clipper DRIVE sweep                   15  null  -10.5 lvl 0.46  null  -10.5 lvl 0.46  null  -10.5 lvl 0.46
+Chain as loaded                        9  null  -29.0 lvl 0.13  null  -33.0 lvl 0.10  null  -33.0 lvl 0.10
+Chain, Leveler at 8 dB                 6  null  -18.1 lvl 0.60  null  -18.0 lvl 0.61  null  -18.1 lvl 0.61
+Pre PUSHED, as loaded                  9  null  -36.1 lvl 0.04  null  -36.1 lvl 0.04  null  -36.1 lvl 0.04
+Pre PUSHED, DRIVE sweep               15  null  -36.0 lvl 0.10  null  -36.0 lvl 0.10  null  -36.0 lvl 0.10
+LIMIT REDUCTION scan / as loaded      15  null  -34.1 lvl 0.12  null  -34.7 lvl 0.12  null  -34.7 lvl 0.12
+LIMIT GR03/08/15                      19  null  -19.6 lvl 0.46  null  -19.8 lvl 0.44  null  -20.1 lvl 0.44
+LIMIT EMPHASIS                         9  null  -22.3 lvl 0.49  null  -22.2 lvl 0.46  null  -22.2 lvl 0.46
+
+   With the filters on (FILTER CLEAN, OVERSAMPLE 2x), against the same Nebula renders. "lvl" is large on the LIN /
+   LVL / LVS passes only because their sweeps run to 40 kHz and the filter removes everything above 25 kHz.
+render                         FILTER OFF (Mac)     CLEAN ANALOG (Mac)   CLEAN LINEAR (Mac)  
+chain_asloaded__LIN            null  -33.0 lvl  0.16  null   -8.8 lvl 20.46  null  -17.5 lvl 20.52
+chain_asloaded__PROG           null  -35.9 lvl  0.07  null  -24.2 lvl  0.08  null  -34.0 lvl  0.09
+chain_C08__LVL                 null  -10.7 lvl  1.50  null   -4.2 lvl 19.17  null   -9.8 lvl 19.22
+chain_C08__PROG                null  -17.7 lvl  0.84  null  -16.7 lvl  0.84  null  -17.7 lvl  0.84
+comp_GR08__PROG                null  -17.8 lvl  0.85  null  -16.3 lvl  0.86  null  -17.7 lvl  0.87
+clip_IN_075__LVS1K             null   -7.8 lvl  1.90  null   -8.0 lvl  1.16  null   -8.3 lvl  1.16
+pre_DRV_075__LVS               null  -17.3 lvl  0.23  null  -14.4 lvl 14.22  null  -16.8 lvl 14.26
+
+3) What changed in v0.4
+   The Leveler's attack wobbled: the gain-cell ripple model (low-note distortion while compressing) also reacted to
+   every onset, so the gain reduction overshot and dipped by 2-4 dB in the first 50 ms. Example, 1 kHz burst
+   -30 -> 0 dBFS at 8 dB setting, gain reduction (dB) after the onset:
+      ms          2      5      7     10     15     20     25     30     40     50    100
+      Nebula   3.59   6.89   8.35   9.73  11.03  11.75  12.17  12.40  12.70  12.91  13.66
+      v0.3.2   4.65   9.95  10.28   8.92   8.08  11.19  14.98  16.79  14.78  12.77  15.14
+      v0.4     4.22   8.51   9.99  11.29  12.36  12.91  13.25  13.48  13.84  14.15  15.20
+   Now the ripple only works while the input level is steady; steady tones are unchanged. A refit of the timing and
+   a steeper bass split in the detector were tried as well and not kept (better on some passes, worse on others).
+
+4) What is left (see README, Known limits): Pre 2nd-harmonic phase at high DRIVE; the Leveler's grab out of very
+   quiet passages and on bass from silence (the Nebula is slower); drum hits (FreeLA2 grabs the start harder, lets go
+   sooner); the Clipper at 20 dB of DRIVE and more (the Nebula's clipper is frequency dependent and shifts phase there).
+
+5) Every render (v0.4, simulated as REAPER renders; Mac v0.3.2 in brackets)
+   pre_asloaded__CAL                  null  -48.1 lvl  0.00   ( -48.1  0.00)
+   pre_asloaded__LIN                  null  -33.1 lvl  0.15   ( -33.1  0.15)
+   pre_asloaded__LVL                  null  -34.6 lvl  0.15   ( -34.6  0.15)
+   pre_asloaded__ST1K                 null  -37.8 lvl  0.01   ( -37.8  0.01)
+   pre_asloaded__ST100                null  -31.8 lvl  0.04   ( -31.8  0.04)
+   pre_asloaded__ST5K                 null  -37.6 lvl  0.02   ( -37.6  0.02)
+   pre_asloaded__HOT                  null  -32.4 lvl  0.09   ( -32.4  0.09)
+   pre_asloaded__DYNS                 null  -46.8 lvl  0.01   ( -46.8  0.01)
+   pre_asloaded__PROG                 null  -39.1 lvl  0.02   ( -39.1  0.02)
+   pre_DRV_000__CAL                   null  -61.4 lvl  0.00   ( -61.4  0.00)
+   pre_DRV_000__LVS                   null  -40.1 lvl  0.11   ( -40.1  0.11)
+   pre_DRV_000__LVS1K                 null  -45.5 lvl  0.02   ( -45.5  0.02)
+   pre_DRV_025__CAL                   null  -58.8 lvl  0.00   ( -58.8  0.00)
+   pre_DRV_025__LVS                   null  -39.4 lvl  0.11   ( -39.4  0.11)
+   pre_DRV_025__LVS1K                 null  -44.6 lvl  0.02   ( -44.6  0.02)
+   pre_DRV_050__CAL                   null  -47.1 lvl  0.00   ( -47.1  0.00)
+   pre_DRV_050__LVS                   null  -31.6 lvl  0.12   ( -31.6  0.12)
+   pre_DRV_050__LVS1K                 null  -35.9 lvl  0.02   ( -35.9  0.02)
+   pre_DRV_075__CAL                   null  -32.9 lvl  0.01   ( -32.9  0.01)
+   pre_DRV_075__LVS                   null  -17.3 lvl  0.23   ( -17.3  0.23)
+   pre_DRV_075__LVS1K                 null  -21.4 lvl  0.10   ( -21.4  0.10)
+   pre_DRV_100__CAL                   null  -18.1 lvl  0.21   ( -18.1  0.21)
+   pre_DRV_100__LVS                   null   -3.1 lvl  0.63   (  -3.1  0.63)
+   pre_DRV_100__LVS1K                 null   -6.9 lvl  0.57   (  -6.9  0.57)
+   pre_OUT_050__CAL                   null  -47.6 lvl  0.00   ( -47.6  0.00)
+   pre_OUT_100__CAL                   null  -47.2 lvl  0.00   ( -47.2  0.00)
+   comp_asloaded__CAL                 null  -50.6 lvl  0.03   ( -50.6  0.03)
+   comp_asloaded__LIN                 null  -50.6 lvl  0.03   ( -50.6  0.03)
+   comp_asloaded__ST1K                null  -26.3 lvl  0.17   ( -26.3  0.17)
+   comp_asloaded__DYNS                null  -50.6 lvl  0.03   ( -50.6  0.03)
+   comp_asloaded__PROG                null  -50.6 lvl  0.03   ( -50.6  0.03)
+   comp_scan_000__CAL                 null  -50.6 lvl  0.03   ( -50.6  0.03)
+   comp_scan_010__CAL                 null  -50.6 lvl  0.03   ( -50.6  0.03)
+   comp_scan_020__CAL                 null  -50.6 lvl  0.03   ( -50.6  0.03)
+   comp_scan_030__CAL                 null  -52.0 lvl  0.02   ( -52.0  0.02)
+   comp_scan_040__CAL                 null  -29.5 lvl  0.20   ( -29.5  0.20)
+   comp_scan_050__CAL                 null  -21.8 lvl  0.50   ( -21.8  0.50)
+   comp_scan_060__CAL                 null  -18.5 lvl  0.54   ( -18.7  0.54)
+   comp_scan_070__CAL                 null  -16.4 lvl  0.52   ( -16.9  0.50)
+   comp_scan_080__CAL                 null  -14.7 lvl  0.50   ( -14.8  0.48)
+   comp_scan_090__CAL                 null  -13.4 lvl  0.48   ( -12.6  0.46)
+   comp_scan_100__CAL                 null  -13.3 lvl  0.43   ( -11.5  0.43)
+   comp_GR08try1__CAL                 null  -19.0 lvl  0.49   ( -19.0  0.49)
+   comp_GR03try1__CAL                 null  -28.9 lvl  0.28   ( -28.9  0.28)
+   comp_GR15try1__CAL                 null  -19.1 lvl  0.38   ( -18.3  0.36)
+   comp_GR08__CAL                     null  -18.7 lvl  0.54   ( -18.7  0.54)
+   comp_GR08__LVL                     null  -10.6 lvl  1.57   ( -10.5  1.56)
+   comp_GR08__ST1K                    null  -29.6 lvl  0.24   ( -29.6  0.24)
+   comp_GR08__ST100                   null  -19.4 lvl  0.59   ( -19.4  0.59)
+   comp_GR08__ST5K                    null  -29.1 lvl  0.28   ( -29.1  0.28)
+   comp_GR08__HOT                     null  -11.1 lvl  1.95   ( -11.0  1.93)
+   comp_GR08__DET                     null  -21.3 lvl  0.72   ( -21.3  0.72)
+   comp_GR08__DYN                     null  -23.5 lvl  0.29   ( -23.2  0.28)
+   comp_GR08__PROG                    null  -17.8 lvl  0.85   ( -17.8  0.85)
+   comp_GR03__CAL                     null  -28.2 lvl  0.26   ( -28.2  0.26)
+   comp_GR03__ST1K                    null  -30.0 lvl  0.23   ( -30.0  0.23)
+   comp_GR03__DYNS                    null  -31.1 lvl  0.23   ( -31.1  0.23)
+   comp_GR03__PROG                    null  -21.5 lvl  0.62   ( -21.5  0.62)
+   comp_GR15__CAL                     null  -14.4 lvl  0.57   ( -14.9  0.54)
+   comp_GR15__ST1K                    null  -30.0 lvl  0.33   ( -30.0  0.33)
+   comp_GR15__DYN                     null  -22.1 lvl  0.31   ( -21.5  0.31)
+   comp_GR15__PROG                    null  -13.5 lvl  1.41   ( -13.2  1.41)
+   comp_OUTPUT_000__CAL               null  -18.4 lvl  0.55   ( -18.4  0.55)
+   comp_OUTPUT_050__CAL               null  -18.3 lvl  0.57   ( -18.3  0.56)
+   comp_OUTPUT_100__CAL               null  -18.7 lvl  0.56   ( -18.8  0.56)
+   comp_AHEAD_000__CAL                null  -32.6 lvl  0.58   ( -31.8  0.58)
+   comp_AHEAD_000__DYNS               null  -25.5 lvl  0.24   ( -25.5  0.24)
+   comp_AHEAD_025__CAL                null  -18.3 lvl  0.55   ( -18.4  0.55)
+   comp_AHEAD_025__DYNS               null  -25.5 lvl  0.24   ( -25.5  0.24)
+   comp_AHEAD_050__CAL                null  -18.3 lvl  0.55   ( -18.4  0.55)
+   comp_AHEAD_050__DYNS               null  -25.5 lvl  0.24   ( -25.5  0.24)
+   comp_AHEAD_075__CAL                null  -18.3 lvl  0.55   ( -18.4  0.55)
+   comp_AHEAD_075__DYNS               null  -25.5 lvl  0.24   ( -25.5  0.24)
+   comp_AHEAD_100__CAL                null  -18.3 lvl  0.55   ( -18.4  0.55)
+   comp_AHEAD_100__DYNS               null  -25.5 lvl  0.24   ( -25.5  0.24)
+   comp_DRY_000__CAL                  null  -18.3 lvl  0.55   ( -18.4  0.55)
+   comp_DRY_000__LVS1K                null  -26.9 lvl  0.32   ( -22.5  0.33)
+   comp_EMPHASIS_000__CAL             null  -18.1 lvl  0.58   ( -18.1  0.58)
+   comp_EMPHASIS_000__DETF            null  -21.6 lvl  0.64   ( -21.4  0.64)
+   comp_EMPHASIS_000__DYNF            null  -22.1 lvl  0.35   ( -22.0  0.35)
+   comp_EMPHASIS_000__PROG            null  -20.5 lvl  0.49   ( -19.5  0.51)
+   comp_EMPHASIS_025__CAL             null  -18.2 lvl  0.57   ( -18.2  0.57)
+   comp_EMPHASIS_025__DETF            null  -21.3 lvl  0.61   ( -21.3  0.60)
+   comp_EMPHASIS_025__DYNF            null  -23.6 lvl  0.31   ( -23.6  0.31)
+   comp_EMPHASIS_050__CAL             null  -18.3 lvl  0.55   ( -18.4  0.55)
+   comp_EMPHASIS_050__DETF            null  -20.0 lvl  0.66   ( -20.0  0.65)
+   comp_EMPHASIS_050__DYNF            null  -22.6 lvl  0.33   ( -22.6  0.34)
+   comp_EMPHASIS_075__CAL             null  -18.5 lvl  0.53   ( -18.6  0.53)
+   comp_EMPHASIS_075__DETF            null  -20.8 lvl  0.63   ( -20.9  0.62)
+   comp_EMPHASIS_075__DYNF            null  -22.9 lvl  0.33   ( -22.9  0.33)
+   comp_EMPHASIS_100__CAL             null  -18.7 lvl  0.52   ( -18.7  0.52)
+   comp_EMPHASIS_100__DETF            null  -20.8 lvl  0.65   ( -20.8  0.64)
+   comp_EMPHASIS_100__DYNF            null  -22.3 lvl  0.35   ( -22.3  0.35)
+   comp_EMPHASIS_100__PROG            null  -17.7 lvl  0.93   ( -17.6  0.94)
+   comp_INPUT_025__CAL                null  -18.2 lvl  0.55   ( -18.2  0.55)
+   comp_INPUT_025__LVS1K              null  -26.9 lvl  0.33   ( -22.5  0.33)
+   comp_INPUT_050__CAL                null  -14.9 lvl  0.79   ( -15.2  0.77)
+   comp_INPUT_050__LVS1K              null  -22.7 lvl  0.35   ( -18.9  0.41)
+   comp_INPUT_075__CAL                null  -15.4 lvl  0.68   ( -14.9  0.65)
+   comp_INPUT_075__LVS1K              null  -17.4 lvl  0.62   ( -15.6  0.69)
+   comp_INPUT_100__CAL                null  -16.4 lvl  0.56   ( -15.3  0.54)
+   comp_INPUT_100__LVS1K              null  -15.5 lvl  0.73   ( -14.2  0.80)
+   clip_asloaded__CAL                 null  -35.0 lvl  0.11   ( -35.0  0.11)
+   clip_asloaded__LIN                 null  -48.3 lvl  0.01   ( -48.3  0.01)
+   clip_asloaded__LVL                 null  -35.8 lvl  0.12   ( -35.8  0.12)
+   clip_asloaded__ST1K                null  -20.6 lvl  0.07   ( -20.6  0.07)
+   clip_asloaded__ST100               null  -30.1 lvl  0.09   ( -30.1  0.09)
+   clip_asloaded__ST5K                null  -20.2 lvl  0.14   ( -20.2  0.14)
+   clip_asloaded__HOT                 null  -33.8 lvl  0.06   ( -33.8  0.06)
+   clip_asloaded__PROG                null  -35.8 lvl  0.10   ( -35.8  0.10)
+   clip_IN_000__CAL                   null  -35.0 lvl  0.11   ( -35.0  0.11)
+   clip_IN_000__LVS                   null  -30.2 lvl  0.13   ( -30.2  0.13)
+   clip_IN_000__LVS1K                 null  -20.2 lvl  0.08   ( -20.2  0.08)
+   clip_IN_025__CAL                   null  -30.6 lvl  0.08   ( -30.6  0.08)
+   clip_IN_025__LVS                   null  -22.9 lvl  0.28   ( -22.9  0.28)
+   clip_IN_025__LVS1K                 null  -10.5 lvl  0.55   ( -10.5  0.55)
+   clip_IN_050__CAL                   null  -10.5 lvl  0.18   ( -10.5  0.18)
+   clip_IN_050__LVS                   null  -13.2 lvl  1.06   ( -13.2  1.06)
+   clip_IN_050__LVS1K                 null   -8.3 lvl  1.17   (  -8.3  1.17)
+   clip_IN_075__CAL                   null   -7.5 lvl  0.07   (  -7.5  0.07)
+   clip_IN_075__LVS                   null  -10.6 lvl  1.69   ( -10.6  1.69)
+   clip_IN_075__LVS1K                 null   -7.8 lvl  1.90   (  -7.8  1.90)
+   clip_IN_100__CAL                   null   -7.1 lvl  0.46   (  -7.1  0.46)
+   clip_IN_100__LVS                   null  -10.3 lvl  2.27   ( -10.3  2.27)
+   clip_IN_100__LVS1K                 null   -9.5 lvl  2.42   (  -9.5  2.42)
+   clip_OUT_000__CAL                  null  -35.0 lvl  0.11   ( -35.0  0.11)
+   clip_OUT_050__CAL                  null  -34.7 lvl  0.12   ( -34.7  0.12)
+   clip_OUT_100__CAL                  null  -35.0 lvl  0.11   ( -35.0  0.11)
+   chain_asloaded__CAL                null  -36.0 lvl  0.10   ( -36.0  0.10)
+   chain_asloaded__LIN                null  -33.0 lvl  0.16   ( -33.0  0.16)
+   chain_asloaded__LVL                null  -33.3 lvl  0.17   ( -33.3  0.17)
+   chain_asloaded__ST1K               null  -21.0 lvl  0.09   ( -21.0  0.09)
+   chain_asloaded__ST100              null  -28.3 lvl  0.10   ( -28.3  0.10)
+   chain_asloaded__ST5K               null  -21.4 lvl  0.12   ( -21.4  0.12)
+   chain_asloaded__HOT                null  -31.1 lvl  0.08   ( -31.1  0.08)
+   chain_asloaded__DYNS               null  -36.8 lvl  0.05   ( -36.8  0.05)
+   chain_asloaded__PROG               null  -35.9 lvl  0.07   ( -35.9  0.07)
+   chain_C08__CAL                     null  -17.4 lvl  0.59   ( -17.5  0.58)
+   chain_C08__LVL                     null  -10.7 lvl  1.51   ( -10.7  1.50)
+   chain_C08__ST1K                    null  -28.9 lvl  0.25   ( -28.9  0.25)
+   chain_C08__ST100                   null  -18.4 lvl  0.64   ( -18.4  0.64)
+   chain_C08__DYNS                    null  -25.2 lvl  0.24   ( -25.2  0.23)
+   chain_C08__PROG                    null  -17.7 lvl  0.84   ( -17.7  0.84)
+   pre_PUSHED_asloaded__CAL           null  -50.4 lvl  0.00   ( -50.4  0.00)
+   pre_PUSHED_asloaded__LIN           null  -33.2 lvl  0.15   ( -33.2  0.15)
+   pre_PUSHED_asloaded__LVL           null  -35.1 lvl  0.15   ( -35.1  0.15)
+   pre_PUSHED_asloaded__ST1K          null  -37.9 lvl  0.01   ( -37.9  0.01)
+   pre_PUSHED_asloaded__ST100         null  -31.8 lvl  0.04   ( -31.8  0.04)
+   pre_PUSHED_asloaded__ST5K          null  -37.8 lvl  0.02   ( -37.8  0.02)
+   pre_PUSHED_asloaded__HOT           null  -32.7 lvl  0.09   ( -32.7  0.09)
+   pre_PUSHED_asloaded__DYNS          null  -50.0 lvl  0.01   ( -50.0  0.01)
+   pre_PUSHED_asloaded__PROG          null  -36.1 lvl  0.05   ( -36.1  0.05)
+   pre_PUSHED_DRV_000__CAL            null  -61.4 lvl  0.00   ( -61.4  0.00)
+   pre_PUSHED_DRV_000__LVS            null  -40.1 lvl  0.11   ( -40.1  0.11)
+   pre_PUSHED_DRV_000__LVS1K          null  -45.5 lvl  0.02   ( -45.5  0.02)
+   pre_PUSHED_DRV_025__CAL            null  -60.1 lvl  0.00   ( -60.1  0.00)
+   pre_PUSHED_DRV_025__LVS            null  -39.4 lvl  0.11   ( -39.4  0.11)
+   pre_PUSHED_DRV_025__LVS1K          null  -44.6 lvl  0.02   ( -44.6  0.02)
+   pre_PUSHED_DRV_050__CAL            null  -50.4 lvl  0.00   ( -50.4  0.00)
+   pre_PUSHED_DRV_050__LVS            null  -31.7 lvl  0.12   ( -31.7  0.12)
+   pre_PUSHED_DRV_050__LVS1K          null  -36.0 lvl  0.02   ( -36.0  0.02)
+   pre_PUSHED_DRV_075__CAL            null  -35.8 lvl  0.01   ( -35.8  0.01)
+   pre_PUSHED_DRV_075__LVS            null  -17.4 lvl  0.21   ( -17.4  0.21)
+   pre_PUSHED_DRV_075__LVS1K          null  -21.5 lvl  0.10   ( -21.5  0.10)
+   pre_PUSHED_DRV_100__CAL            null  -20.8 lvl  0.11   ( -20.8  0.11)
+   pre_PUSHED_DRV_100__LVS            null   -3.1 lvl  0.49   (  -3.1  0.49)
+   pre_PUSHED_DRV_100__LVS1K          null   -7.0 lvl  0.55   (  -7.0  0.55)
+   comp_LIMIT_asloaded__CAL           null  -63.6 lvl  0.01   ( -63.6  0.01)
+   comp_LIMIT_asloaded__ST1K          null  -16.6 lvl  0.46   ( -16.6  0.46)
+   comp_LIMIT_asloaded__DYNS          null  -56.7 lvl  0.01   ( -56.7  0.01)
+   comp_LIMIT_asloaded__PROG          null  -60.3 lvl  0.01   ( -60.3  0.01)
+   comp_LIMIT_scan_000__CAL           null  -63.1 lvl  0.01   ( -63.1  0.01)
+   comp_LIMIT_scan_010__CAL           null  -63.7 lvl  0.01   ( -63.7  0.01)
+   comp_LIMIT_scan_020__CAL           null  -61.3 lvl  0.01   ( -61.3  0.01)
+   comp_LIMIT_scan_030__CAL           null  -46.7 lvl  0.03   ( -46.7  0.03)
+   comp_LIMIT_scan_040__CAL           null  -34.7 lvl  0.12   ( -34.7  0.12)
+   comp_LIMIT_scan_050__CAL           null  -24.7 lvl  0.37   ( -24.7  0.37)
+   comp_LIMIT_scan_060__CAL           null  -19.9 lvl  0.46   ( -20.2  0.46)
+   comp_LIMIT_scan_070__CAL           null  -18.2 lvl  0.36   ( -19.2  0.34)
+   comp_LIMIT_scan_080__CAL           null  -16.1 lvl  0.37   ( -15.4  0.33)
+   comp_LIMIT_scan_090__CAL           null  -13.3 lvl  0.52   ( -10.3  0.52)
+   comp_LIMIT_scan_100__CAL           null  -10.6 lvl  0.78   (  -7.1  0.81)
+   comp_LIMIT_GR08try1__CAL           null  -19.7 lvl  0.44   ( -19.8  0.44)
+   comp_LIMIT_GR08try2__CAL           null  -20.1 lvl  0.47   ( -20.2  0.47)
+   comp_LIMIT_GR03try1__CAL           null  -29.0 lvl  0.25   ( -29.0  0.25)
+   comp_LIMIT_GR15try1__CAL           null  -20.4 lvl  0.25   ( -18.8  0.22)
+   comp_LIMIT_GR08__CAL               null  -19.7 lvl  0.46   ( -19.8  0.46)
+   comp_LIMIT_GR08__LVL               null  -10.9 lvl  1.49   ( -10.8  1.49)
+   comp_LIMIT_GR08__ST1K              null  -26.3 lvl  0.29   ( -26.3  0.29)
+   comp_LIMIT_GR08__ST100             null  -14.5 lvl  0.99   ( -14.5  0.99)
+   comp_LIMIT_GR08__ST5K              null  -23.5 lvl  0.39   ( -23.5  0.39)
+   comp_LIMIT_GR08__HOT               null   -9.3 lvl  2.47   (  -9.0  2.50)
+   comp_LIMIT_GR08__DET               null  -19.6 lvl  0.97   ( -19.5  0.97)
+   comp_LIMIT_GR08__DYN               null  -23.0 lvl  0.24   ( -21.9  0.24)
+   comp_LIMIT_GR08__PROG              null  -18.2 lvl  0.78   ( -18.2  0.78)
+   comp_LIMIT_GR03__CAL               null  -28.6 lvl  0.20   ( -28.6  0.20)
+   comp_LIMIT_GR03__ST1K              null  -27.1 lvl  0.24   ( -27.1  0.24)
+   comp_LIMIT_GR03__DYNS              null  -31.8 lvl  0.15   ( -31.9  0.15)
+   comp_LIMIT_GR15__CAL               null  -15.7 lvl  0.48   ( -16.5  0.44)
+   comp_LIMIT_GR15__ST1K              null  -24.7 lvl  0.49   ( -24.7  0.49)
+   comp_LIMIT_GR15__DYNS              null  -18.9 lvl  0.36   ( -18.6  0.37)
+   comp_LIMIT_EMPHASIS_000__CAL       null  -18.9 lvl  0.52   ( -19.0  0.52)
+   comp_LIMIT_EMPHASIS_000__DETF      null  -23.9 lvl  0.50   ( -23.3  0.50)
+   comp_LIMIT_EMPHASIS_000__DYNF      null  -23.8 lvl  0.25   ( -23.7  0.25)
+   comp_LIMIT_EMPHASIS_050__CAL       null  -19.5 lvl  0.46   ( -19.6  0.46)
+   comp_LIMIT_EMPHASIS_050__DETF      null  -20.4 lvl  0.63   ( -20.4  0.63)
+   comp_LIMIT_EMPHASIS_050__DYNF      null  -22.2 lvl  0.35   ( -22.2  0.35)
+   comp_LIMIT_EMPHASIS_100__CAL       null  -20.0 lvl  0.42   ( -20.0  0.42)
+   comp_LIMIT_EMPHASIS_100__DETF      null  -22.5 lvl  0.53   ( -22.4  0.52)
+   comp_LIMIT_EMPHASIS_100__DYNF      null  -23.8 lvl  0.33   ( -23.8  0.33)
+   fxA_chain_asloaded__LIN            null   -8.8 lvl 18.31   (  -8.8 20.46)
+   fxA_chain_asloaded__PROG           null  -24.2 lvl  0.08   ( -24.2  0.08)
+   fxA_chain_C08__LVL                 null   -4.2 lvl 16.75   (  -4.2 19.17)
+   fxA_chain_C08__PROG                null  -16.7 lvl  0.84   ( -16.7  0.84)
+   fxA_comp_GR08__PROG                null  -16.3 lvl  0.87   ( -16.3  0.86)
+   fxA_clip_IN_075__LVS1K             null   -8.0 lvl  1.16   (  -8.0  1.16)
+   fxA_pre_DRV_075__LVS               null  -14.4 lvl 12.15   ( -14.4 14.22)
+   fxL_chain_asloaded__LIN            null  -17.5 lvl 18.36   ( -17.5 20.52)
+   fxL_chain_asloaded__PROG           null  -34.0 lvl  0.09   ( -34.0  0.09)
+   fxL_chain_C08__LVL                 null   -9.8 lvl 16.80   (  -9.8 19.22)
+   fxL_chain_C08__PROG                null  -17.7 lvl  0.84   ( -17.7  0.84)
+   fxL_comp_GR08__PROG                null  -17.7 lvl  0.87   ( -17.7  0.87)
+   fxL_clip_IN_075__LVS1K             null   -8.3 lvl  1.16   (  -8.3  1.16)
+   fxL_pre_DRV_075__LVS               null  -16.8 lvl 12.20   ( -16.8 14.26)

@@ -32,7 +32,8 @@ PT = {}
 for t in HAS_PROG:
     ref = resample_poly(load('%s_%s__PROG' % (PROG, t)), 1, DEC, axis=0)
     g, mk = prog_gr(ref, xlow('PROG')); PT[t] = (g, mk)
-WP = 0.5          # weight of the program material relative to the bursts
+import os
+WP = float(os.environ.get('WP', '0.5'))          # weight of the program material relative to the bursts (v0.4 refit: 1.0)
 def model_for(p):
     T = tables(PROG)
     pp = json.load(open(prog_file(PROG)))
