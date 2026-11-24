@@ -1,5 +1,10 @@
 name: Build FreeLA2
 
+# Two builds on every upload (commit), each with its own download in the run's page:
+#   FreeLA2-macOS-build-N    VST3 + AU, universal (Apple Silicon + Intel), macOS 11 or later
+#   FreeLA2-Windows-build-N  VST3, 64-bit, Windows 10 or later (no Visual C++ runtime to install)
+# N is the build number; the plug-in shows it in its top bar. If one build fails, the other still finishes.
+
 on:
   push:
   workflow_dispatch:
@@ -35,8 +40,12 @@ jobs:
           codesign --force --deep -s - "build/FreeLA2_artefacts/Release/VST3/FreeLA2.vst3"
           codesign --force --deep -s - "build/FreeLA2_artefacts/Release/AU/FreeLA2.component"
 
-      - name: Check architectures
-        run: lipo -info "build/FreeLA2_artefacts/Release/VST3/FreeLA2.vst3/Contents/MacOS/FreeLA2"
+      - name: "Check architectures (must list x86_64 and arm64)"
+        run: |
+          for f in "build/FreeLA2_artefacts/Release/VST3/FreeLA2.vst3/Contents/MacOS/FreeLA2" "build/FreeLA2_artefacts/Release/AU/FreeLA2.component/Contents/MacOS/FreeLA2"; do
+            a=$(lipo -archs "$f"); echo "$f: $a"
+            case "$a" in *x86_64*arm64*|*arm64*x86_64*) ;; *) echo "ERROR: not universal"; exit 1;; esac
+          done
 
       - name: Package
         run: |
@@ -50,3 +59,51 @@ jobs:
         with:
           name: FreeLA2-macOS-build-${{ github.run_number }}
           path: FreeLA2-macOS.zip
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Configure (Windows 10 and later, 64-bit, Visual C++ runtime built in)"
+        run: cmake -B build -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded -DFREELA2_BUILD_NUMBER=${{ github.run_number }}
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target FreeLA2_VST3 -- /m /verbosity:minimal
+
+      - name: "Check the plug-in (64-bit, needs no Visual C++ runtime)"
+        shell: pwsh
+        run: |
+          $dll = "build/FreeLA2_artefacts/Release/VST3/FreeLA2.vst3/Contents/x86_64-win/FreeLA2.vst3"
+          if (-not (Test-Path $dll)) { Write-Error "plug-in not found: $dll"; exit 1 }
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($dumpbin) {
+            $out = & $dumpbin.FullName /headers /dependents $dll | Out-String
+            $out -split "`n" | Select-String -Pattern "machine|\.dll" | ForEach-Object { $_.Line.Trim() }
+            if ($out -notmatch "8664 machine") { Write-Error "not a 64-bit (x64) plug-in"; exit 1 }
+            if ($out -match "(?i)vcruntime|msvcp") { Write-Error "plug-in needs the Visual C++ runtime"; exit 1 }
+          } else { Write-Warning "dumpbin not found, skipped the dependency check" }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item -Recurse "build/FreeLA2_artefacts/Release/VST3/FreeLA2.vst3" dist/
+          @(
+            "FreeLA2 for Windows 10 and later (64-bit VST3), build ${{ github.run_number }}",
+            "",
+            "Install:",
+            "1. If Windows shows this zip as blocked: right-click it > Properties > tick Unblock > OK. Then unzip it.",
+            "2. Copy the whole FreeLA2.vst3 folder into  C:\Program Files\Common Files\VST3",
+            "   (Windows asks for administrator permission: click Continue).",
+            "3. Rescan plug-ins in your DAW (REAPER: Options > Preferences > Plug-ins > VST > Re-scan).",
+            "",
+            "Update: delete the old FreeLA2.vst3 folder there first, then copy the new one."
+          ) | Set-Content dist/INSTALL-Windows.txt
+          Compress-Archive -Path dist/* -DestinationPath FreeLA2-Windows.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FreeLA2-Windows-build-${{ github.run_number }}
+          path: FreeLA2-Windows.zip
